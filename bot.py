@@ -225,7 +225,8 @@ def get_admin_keyboard():
         InlineKeyboardButton("🗑️ Remove Channel", callback_data="admin_rm_channel")
     )
     markup.add(
-        InlineKeyboardButton("🗑️ Remove Task", callback_data="admin_remove_task")
+        InlineKeyboardButton("🗑️ Remove Task", callback_data="admin_remove_task"),
+        InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")
     )
     return markup
 
@@ -399,6 +400,9 @@ def handle_callbacks(call):
     elif call.data == "admin_ref_bonus":
         msg = bot.send_message(user_id, f"Current Referral Bonus: {get_ref_bonus()} ৳\n\nSend the **new amount** (in ৳):", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_ref_bonus)
+    elif call.data == "admin_broadcast":
+        msg = bot.send_message(user_id, "📣 **Broadcast Message**\n\nSend the message you want to broadcast to **ALL users**.\nYou can send text or a photo with a caption.", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_broadcast)
     elif call.data == "admin_view_users":
         send_all_users_report(user_id)
     elif call.data.startswith("submit_task_"):
@@ -513,6 +517,31 @@ def process_task_tutorial(message, title, url, limit):
     add_task(title, url, limit, tutorial_url)
     tut_text = f"\nTutorial: {tutorial_url}" if tutorial_url else ""
     bot.reply_to(message, f"✅ Task added successfully!\nTitle: {title}\nURL: {url}\nLimit: {limit} users{tut_text}")
+
+def process_broadcast(message):
+    admin_id = message.from_user.id
+    users = get_all_users()
+    if not users:
+        return bot.reply_to(message, "No users found in database.")
+
+    bot.send_message(admin_id, f"🚀 Starting broadcast to {len(users)} users... Please wait.")
+    
+    success = 0
+    fail = 0
+    
+    for u in users:
+        target_id = u.get('_id')
+        try:
+            if message.photo:
+                bot.send_photo(target_id, message.photo[-1].file_id, caption=message.caption, caption_entities=message.caption_entities)
+            else:
+                bot.send_message(target_id, message.text, entities=message.entities)
+            success += 1
+        except Exception as e:
+            fail += 1
+            print(f"Broadcast failed for user {target_id}: {e}")
+            
+    bot.send_message(admin_id, f"✅ **Broadcast Finished!**\n\n🟢 Success: {success}\n🔴 Failed: {fail}", parse_mode="Markdown")
 
 def process_ref_bonus(message):
     try:
