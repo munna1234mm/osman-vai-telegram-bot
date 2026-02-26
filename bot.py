@@ -52,5 +52,7 @@ def handle_messages(message):
         bot.reply_to(message, "I didn't understand that. Please use the menu.", reply_markup=get_main_keyboard())
 
 if __name__ == '__main__':
+    print("Removing any existing webhooks...")
+    bot.remove_webhook()
     print("Bot is running...")
     bot.infinity_polling()
