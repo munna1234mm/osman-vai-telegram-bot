@@ -1,18 +1,17 @@
 import telebot
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton, Update
 import os
+from fastapi import FastAPI, Request
+import uvicorn
 
-# To ensure the token isn't hardcoded entirely in standard practice, 
-# but for fast access, we'll use the provided token explicitly if not in enviroment.
 TOKEN = os.getenv("BOT_TOKEN", "8243932163:AAFRMmbcIJqQgbQCrSpJIiHpKesHS5mH-LI")
 bot = telebot.TeleBot(TOKEN)
+app = FastAPI()
 
-# Basic Admin IDs - replace with real user ID
-ADMIN_ID = -1 
+ADMIN_ID = -1
 
 def get_main_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    # Buttons as requested
     btn_one_task = KeyboardButton("One Task")
     btn_daily_task = KeyboardButton("Daily Task")
     btn_invite = KeyboardButton("Invite")
@@ -31,8 +30,6 @@ def send_welcome(message):
 
 @bot.message_handler(commands=['admin'])
 def handle_admin(message):
-    # In a real scenario, you'd check: if message.from_user.id == ADMIN_ID:
-    # Here we just respond with the admin panel text for demonstration.
     bot.reply_to(message, "⚙️ Welcome to the Admin Panel!\n(Here you can add admin specific configuration)")
 
 @bot.message_handler(func=lambda message: True)
@@ -51,8 +48,21 @@ def handle_messages(message):
     else:
         bot.reply_to(message, "I didn't understand that. Please use the menu.", reply_markup=get_main_keyboard())
 
+
+# FastAPI routes for Webhook
+@app.post(f"/{TOKEN}/")
+async def process_webhook(request: Request):
+    json_str = await request.body()
+    update = Update.de_json(json_str.decode('utf-8'))
+    bot.process_new_updates([update])
+    return {"status": "ok"}
+
+@app.get("/")
+def home():
+    return {"status": "Bot is running on Render!"}
+
+# Required to run on Render
 if __name__ == '__main__':
-    print("Removing any existing webhooks...")
-    bot.remove_webhook()
-    print("Bot is running...")
-    bot.infinity_polling()
+    # When testing locally, you can use polling or set up ngrok for webhook.
+    # For now we'll assume Render handles the execution via uvicorn.
+    print("Bot configuration loaded. To run locally, use 'uvicorn bot:app --host 0.0.0.0 --port 10000'")
