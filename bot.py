@@ -5,6 +5,13 @@ from fastapi import FastAPI, Request
 import uvicorn
 import json
 
+# --- Configurations ---
+TOKEN = os.getenv("BOT_TOKEN", "8243932163:AAFRMmbcIJqQgbQCrSpJIiHpKesHS5mH-LI")
+bot = telebot.TeleBot(TOKEN)
+app = FastAPI()
+
+ADMIN_IDS = []
+
 DB_FILE = "database.json"
 
 def load_db():
