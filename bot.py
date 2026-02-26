@@ -11,40 +11,60 @@ TOKEN = os.getenv("BOT_TOKEN", "8243932163:AAFRMmbcIJqQgbQCrSpJIiHpKesHS5mH-LI")
 bot = telebot.TeleBot(TOKEN)
 app = FastAPI()
 
-# Replace with your own Admin ID! For now, we allow any ID to use /admin for testing if not set.
-# Example: ADMIN_IDS = [123456789]
 ADMIN_IDS = [] 
 
-# --- Database Connection ---
-# We use an environment variable for MongoDB. If not provided, it falls back to a free cluster for demonstration.
-# WARNING: This fallback URL should be replaced by the user's own MongoDB connection string.
 MONGO_URL = os.getenv("MONGO_URL", "mongodb+srv://testuser:testpass123@cluster0.exmple.mongodb.net/?retryWrites=true&w=majority")
 try:
     client = MongoClient(MONGO_URL, tlsCAFile=certifi.where())
     db = client['telegram_bot']
     users_collection = db['users']
     settings_collection = db['settings']
+    tasks_collection = db['tasks']
     print("Connected to MongoDB successfully!")
 except Exception as e:
     print(f"Error connecting to MongoDB: {e}")
-    # Fallback to local dicts if DB utterly fails
     users_collection = None
     settings_collection = None
+    tasks_collection = None
 
-# Fallback Memory (if DB connection fails or isn't set up yet)
+# Fallback Memory
 memory_banned = set()
 memory_balances = {}
 memory_channel = None
+memory_tasks = []
+memory_ref_bonus = 0
 
 # --- Helper Functions for Database ---
-def get_user(user_id):
+def get_user(user_id, username=None):
     if users_collection is not None:
         user = users_collection.find_one({"_id": user_id})
+        update_data = {}
+        if username:
+            update_data["username"] = username.lower()
+            
         if not user:
             user = {"_id": user_id, "balance": 0, "banned": False}
+            if username:
+                user["username"] = username.lower()
             users_collection.insert_one(user)
+        elif username and user.get("username") != username.lower():
+            users_collection.update_one({"_id": user_id}, {"$set": {"username": username.lower()}})
+            user["username"] = username.lower()
         return user
-    return {"_id": user_id, "balance": memory_balances.get(user_id, 0), "banned": user_id in memory_banned}
+    return {"_id": user_id, "balance": memory_balances.get(user_id, 0), "banned": user_id in memory_banned, "username": username.lower() if username else None}
+
+def get_user_by_input(input_str):
+    """ Tries to find a user by ID or username """
+    if users_collection is not None:
+        try:
+            # Try by ID first
+            uid = int(input_str)
+            return users_collection.find_one({"_id": uid})
+        except ValueError:
+            # If not a number, try by username
+            clean_username = input_str.replace('@', '').lower().strip()
+            return users_collection.find_one({"username": clean_username})
+    return None
 
 def update_user_balance(user_id, amount):
     if users_collection is not None:
@@ -79,16 +99,40 @@ def set_mandatory_channel(channel_id):
     else:
         memory_channel = channel_id
 
+def get_ref_bonus():
+    if settings_collection is not None:
+        setting = settings_collection.find_one({"_id": "referral_bonus"})
+        if setting:
+            return setting.get("amount", 0)
+    return memory_ref_bonus
+
+def set_ref_bonus(amount):
+    global memory_ref_bonus
+    if settings_collection is not None:
+        settings_collection.update_one({"_id": "referral_bonus"}, {"$set": {"amount": amount}}, upsert=True)
+    else:
+        memory_ref_bonus = amount
+
+def add_task(title, url):
+    if tasks_collection is not None:
+        tasks_collection.insert_one({"title": title, "url": url})
+    else:
+        memory_tasks.append({"title": title, "url": url})
+
+def get_all_tasks():
+    if tasks_collection is not None:
+        return list(tasks_collection.find())
+    return memory_tasks
+
 def is_admin(user_id):
     if not ADMIN_IDS:
-        return True # If no admins specified, let anyone use it for testing
+        return True 
     return user_id in ADMIN_IDS
 
-# --- Middlewares (Check Ban & Join) ---
 def check_join(user_id):
     channel = get_mandatory_channel()
     if not channel:
-        return True # No channel required
+        return True 
     try:
         member = bot.get_chat_member(channel, user_id)
         if member.status in ['left', 'kicked']:
@@ -96,7 +140,6 @@ def check_join(user_id):
         return True
     except Exception as e:
         print(f"Error checking channel membership: {e}")
-        # If bot is not admin in the channel, it will throw an error. We allow them to pass for safety.
         return True 
 
 # --- Keyboards ---
@@ -119,6 +162,10 @@ def get_admin_keyboard():
     )
     markup.add(
         InlineKeyboardButton("💰 Edit Balance", callback_data="admin_balance"),
+        InlineKeyboardButton("🎁 Set Ref Bonus", callback_data="admin_ref_bonus")
+    )
+    markup.add(
+        InlineKeyboardButton("➕ Add Task", callback_data="admin_add_task")
     )
     markup.add(
         InlineKeyboardButton("📢 Add/Change Channel", callback_data="admin_channel"),
@@ -129,21 +176,50 @@ def get_admin_keyboard():
 def get_join_keyboard():
     markup = InlineKeyboardMarkup()
     channel = get_mandatory_channel()
-    # Assuming channel is a username like @mychannel. 
-    # If it's a private ID, we can't easily generate a link without storing it.
     link = f"https://t.me/{channel.replace('@', '')}" if channel and channel.startswith('@') else "https://t.me"
     markup.add(InlineKeyboardButton("📢 Join Channel", url=link))
     markup.add(InlineKeyboardButton("✅ Joined", callback_data="check_join"))
     return markup
 
+def get_tasks_keyboard():
+    markup = InlineKeyboardMarkup()
+    tasks = get_all_tasks()
+    for task in tasks:
+        markup.add(InlineKeyboardButton(task['title'], url=task['url']))
+    return markup
 
 # --- Core Command Handlers ---
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    user = get_user(message.from_user.id)
+    user_id = message.from_user.id
+    username = message.from_user.username
+    
+    # Check if this is a new user for referral
+    is_new = False
+    if users_collection is not None:
+        existing = users_collection.find_one({"_id": user_id})
+        if not existing:
+            is_new = True
+
+    user = get_user(user_id, username)
     if user.get("banned"):
         return bot.reply_to(message, "You are banned from using this bot.")
         
+    # Handle Referral Logic
+    if is_new and " " in message.text:
+        referrer_id_str = message.text.split(" ")[1]
+        try:
+            referrer_id = int(referrer_id_str)
+            if referrer_id != user_id:
+                referrer = get_user(referrer_id)
+                if referrer:
+                    bonus = get_ref_bonus()
+                    new_balance = referrer.get("balance", 0) + bonus
+                    update_user_balance(referrer_id, new_balance)
+                    bot.send_message(referrer_id, f"🎉 Someone joined using your invite link! You received {bonus} ৳.")
+        except ValueError:
+            pass
+
     bot.reply_to(
         message, 
         "Welcome to the Task Bot! Please choose an option below:", 
@@ -157,12 +233,11 @@ def handle_admin(message):
 
     bot.reply_to(message, "⚙️ Welcome to the Admin Panel!\nChoose an action:", reply_markup=get_admin_keyboard())
 
-# --- Callback Handlers (Admin & User) ---
+# --- Callback Handlers ---
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
     user_id = call.from_user.id
     
-    # User Join Check
     if call.data == "check_join":
         if check_join(user_id):
             bot.answer_callback_query(call.id, "Verification successful!", show_alert=True)
@@ -171,56 +246,61 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, "You have not joined the channel yet.", show_alert=True)
         return
 
-    # Admin Callbacks
     if not is_admin(user_id):
         return bot.answer_callback_query(call.id, "Access Denied.")
 
     if call.data == "admin_ban":
-        msg = bot.send_message(user_id, "Send the User ID to BAN:")
+        msg = bot.send_message(user_id, "Send the User ID or @username to BAN:")
         bot.register_next_step_handler(msg, process_ban)
     elif call.data == "admin_unban":
-        msg = bot.send_message(user_id, "Send the User ID to UNBAN:")
+        msg = bot.send_message(user_id, "Send the User ID or @username to UNBAN:")
         bot.register_next_step_handler(msg, process_unban)
     elif call.data == "admin_balance":
-        msg = bot.send_message(user_id, "Send the User ID to edit balance:")
-        bot.register_next_step_handler(msg, process_balance_user_id)
+        msg = bot.send_message(user_id, "Send the User ID or @username to edit balance:")
+        bot.register_next_step_handler(msg, process_balance_user_input)
     elif call.data == "admin_channel":
         msg = bot.send_message(user_id, "Send the Channel Username (e.g., @mychannel):\n\n*Make sure this bot is added as an Admin in that channel first!*", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_add_channel)
     elif call.data == "admin_rm_channel":
         set_mandatory_channel(None)
         bot.send_message(user_id, "Mandatory channel verification has been removed.")
+    elif call.data == "admin_add_task":
+        msg = bot.send_message(user_id, "Send the **Title** of the new Task (e.g., 'Subscribe to YouTube'):", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_task_title)
+    elif call.data == "admin_ref_bonus":
+        msg = bot.send_message(user_id, f"Current Referral Bonus: {get_ref_bonus()} ৳\n\nSend the **new amount** (in ৳):", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_ref_bonus)
 
 # --- Admin Step Functions ---
 def process_ban(message):
-    try:
-        target_id = int(message.text)
-        ban_user(target_id)
-        bot.reply_to(message, f"User {target_id} has been successfully banned.")
-    except ValueError:
-        bot.reply_to(message, "Invalid User ID. Please send a number.")
+    target_user = get_user_by_input(message.text)
+    if target_user:
+        ban_user(target_user['_id'])
+        bot.reply_to(message, f"Successfully banned User: {target_user.get('username') or target_user['_id']}.")
+    else:
+        bot.reply_to(message, "User not found in database. Make sure they have started the bot before.")
 
 def process_unban(message):
-    try:
-        target_id = int(message.text)
-        unban_user(target_id)
-        bot.reply_to(message, f"User {target_id} has been successfully unbanned.")
-    except ValueError:
-        bot.reply_to(message, "Invalid User ID.")
+    target_user = get_user_by_input(message.text)
+    if target_user:
+        unban_user(target_user['_id'])
+        bot.reply_to(message, f"Successfully unbanned User: {target_user.get('username') or target_user['_id']}.")
+    else:
+        bot.reply_to(message, "User not found in database.")
 
-def process_balance_user_id(message):
-    try:
-        target_id = int(message.text)
-        msg = bot.reply_to(message, f"Send the new balance amount for user {target_id}:")
-        bot.register_next_step_handler(msg, process_balance_amount, target_id)
-    except ValueError:
-        bot.reply_to(message, "Invalid User ID.")
+def process_balance_user_input(message):
+    target_user = get_user_by_input(message.text)
+    if target_user:
+        msg = bot.reply_to(message, f"Current balance: {target_user.get('balance', 0)} ৳\nSend the new balance amount for {target_user.get('username') or target_user['_id']}:")
+        bot.register_next_step_handler(msg, process_balance_amount, target_user['_id'])
+    else:
+        bot.reply_to(message, "User not found in database.")
 
 def process_balance_amount(message, target_id):
     try:
         amount = int(message.text)
         update_user_balance(target_id, amount)
-        bot.reply_to(message, f"User {target_id}'s balance has been updated to {amount} Tokens.")
+        bot.reply_to(message, f"Balance has been updated to {amount} ৳.")
     except ValueError:
         bot.reply_to(message, "Invalid amount. Must be a number.")
 
@@ -232,17 +312,38 @@ def process_add_channel(message):
     set_mandatory_channel(channel)
     bot.reply_to(message, f"Channel set to {channel}.\nAll users must now join this channel.")
 
+def process_task_title(message):
+    title = message.text.strip()
+    msg = bot.reply_to(message, f"Task Title set to: {title}\nNow, send the **URL Link** for this task:", parse_mode="Markdown")
+    bot.register_next_step_handler(msg, process_task_url, title)
+
+def process_task_url(message, title):
+    url = message.text.strip()
+    if not url.startswith("http"):
+        return bot.reply_to(message, "Invalid URL. Please start again from /admin and provide a valid link (e.g., https://youtube.com).")
+    
+    add_task(title, url)
+    bot.reply_to(message, f"✅ Task added successfully!\nTitle: {title}\nURL: {url}")
+
+def process_ref_bonus(message):
+    try:
+        bonus = int(message.text)
+        set_ref_bonus(bonus)
+        bot.reply_to(message, f"✅ Referral bonus updated to {bonus} ৳.")
+    except ValueError:
+        bot.reply_to(message, "Invalid amount. Must be a number.")
+
+
 # --- Text Message Handler ---
 @bot.message_handler(func=lambda message: True)
 def handle_messages(message):
     user_id = message.from_user.id
-    user = get_user(user_id)
+    username = message.from_user.username
+    user = get_user(user_id, username)
 
-    # 1. Check if banned
     if user.get("banned"):
         return
 
-    # 2. Check if channel join is required
     if not check_join(user_id):
         return bot.reply_to(
             message, 
@@ -250,17 +351,20 @@ def handle_messages(message):
             reply_markup=get_join_keyboard()
         )
 
-    # 3. Process normal commands
     text = message.text
     if text == "One Task":
-        bot.reply_to(message, "📝 You selected: One Task\nThis feature is coming soon!")
+        tasks = get_all_tasks()
+        if not tasks:
+            bot.reply_to(message, "📝 There are no tasks available right now.")
+        else:
+            bot.reply_to(message, "📝 Available Tasks:", reply_markup=get_tasks_keyboard())
     elif text == "Daily Task":
         bot.reply_to(message, "📅 You selected: Daily Task\nComplete your daily task to earn rewards!")
     elif text == "Invite":
-        bot.reply_to(message, f"🔗 Here is your personal invite link: https://t.me/{bot.get_me().username}?start={user_id}")
+        bot.reply_to(message, f"🔗 Here is your personal invite link: https://t.me/{bot.get_me().username}?start={user_id}\n\nInvite friends to earn {get_ref_bonus()} ৳ per referral!")
     elif text == "Balance":
         balance = user.get("balance", 0)
-        bot.reply_to(message, f"💰 Balance: {balance} Tokens")
+        bot.reply_to(message, f"💰 Balance: {balance} ৳")
     elif text == "FAQ":
         bot.reply_to(message, "❓ Frequently Asked Questions:\n1. How to earn? Complete tasks.\n2. How to invite? Use your invite link.")
     else:
@@ -280,4 +384,4 @@ def home():
     return {"status": "Bot is running on Render!"}
 
 if __name__ == '__main__':
-    print("Bot configuration loaded. To run locally, use 'uvicorn bot:app --host 0.0.0.0 --port 10000'")
+    print("Bot configuration loaded.")
