@@ -185,6 +185,7 @@ def get_main_keyboard():
         KeyboardButton("Daily Task"),
         KeyboardButton("Invite"),
         KeyboardButton("Balance"),
+        KeyboardButton("My Profile"),
         KeyboardButton("📊 Status"),
         KeyboardButton("FAQ")
     )
@@ -592,8 +593,8 @@ def process_withdraw_amount(message, method, number):
     try:
         amount = int(message.text.strip())
         user = get_user(user_id)
-        if amount < 10:
-            return bot.reply_to(message, "❌ Minimum withdrawal is 10 ৳.")
+        if amount < 20:
+            return bot.reply_to(message, "❌ Minimum withdrawal is 20 ৳.")
         if user["balance"] < amount:
             return bot.reply_to(message, "❌ Insufficient balance!")
 
@@ -656,6 +657,17 @@ def handle_messages(message):
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("💳 Withdraw", callback_data="user_withdraw"))
         bot.reply_to(message, f"💰 **Available Balance:** {balance} ৳\n💼 **Hold Balance:** {hold} ৳", parse_mode="Markdown", reply_markup=markup)
+    elif text == "My Profile":
+        balance = user.get("balance", 0)
+        hold = user.get("hold_balance", 0)
+        profile_text = (
+            f"🧑‍💻 **My Profile ID:** `{user_id}`\n\n"
+            f"💸 **Available ব্যালেন্স:** {balance} ৳\n"
+            f"💼 **Hold ব্যালেন্স:** {hold} ৳\n\n"
+            f"💸 **মিনিমাম উইথড্র মাএ ২০ টাকা** 💸\n"
+            f"🧑‍💻 **পেমেন্ট বিকাশ/নগদ** 🏧"
+        )
+        bot.reply_to(message, profile_text, parse_mode="Markdown")
     elif text == "📊 Status":
         comp = user.get("completed_tasks", 0)
         rej = user.get("rejected_tasks", 0)
