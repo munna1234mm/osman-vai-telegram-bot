@@ -394,26 +394,31 @@ def process_task_reward(message, target_id):
         bot.reply_to(message, "Invalid amount. Must be a number. Start over from the admin panel if needed.")
 
 def send_all_users_report(admin_id):
-    users = get_all_users()
-    if not users:
-        return bot.send_message(admin_id, "No users found.")
-    
-    report = "👥 **All Users Report**\n\n"
-    for u in users:
-        uid = u.get('_id', 'Unknown')
-        uname = f"@{u.get('username')}" if u.get('username') else "N/A"
-        bal = u.get('balance', 0)
-        ban = "Yes" if u.get('banned') else "No"
-        report += f"ID: `{uid}` | User: {uname} | Bal: {bal}৳ | Banned: {ban}\n"
-    
-    if len(report) > 4000:
-        with open("users_report.txt", "w", encoding="utf-8") as f:
-            f.write(report)
-        with open("users_report.txt", "rb") as f:
-            bot.send_document(admin_id, f, caption="Users Report is too long for a message, so here is the file.")
-        os.remove("users_report.txt")
-    else:
-        bot.send_message(admin_id, report, parse_mode="Markdown")
+    try:
+        users = get_all_users()
+        if not users:
+            return bot.send_message(admin_id, "No users found in database.")
+        
+        report = "👥 **All Users Report**\n\n"
+        for u in users:
+            uid = u.get('_id', 'Unknown')
+            uname = f"@{u.get('username')}" if u.get('username') else "N/A"
+            bal = u.get('balance', 0)
+            ban = "Yes" if u.get('banned') else "No"
+            report += f"ID: `{uid}` | User: {uname} | Bal: {bal}৳ | Banned: {ban}\n"
+        
+        if len(report) > 3500:
+            file_path = f"users_report_{admin_id}.txt"
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(report)
+            with open(file_path, "rb") as f:
+                bot.send_document(admin_id, f, caption="Users Report is too long for a single message.")
+            os.remove(file_path)
+        else:
+            bot.send_message(admin_id, report, parse_mode="Markdown")
+    except Exception as e:
+        print(f"Error generating users report: {e}")
+        bot.send_message(admin_id, f"❌ Error generating report: {e}")
 
 
 # --- Text Message Handler ---
