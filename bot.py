@@ -119,6 +119,11 @@ def add_task(title, url):
     else:
         memory_tasks.append({"title": title, "url": url})
 
+def get_all_users():
+    if users_collection is not None:
+        return list(users_collection.find())
+    return [{"_id": k, "balance": v, "banned": k in memory_banned} for k, v in memory_balances.items()]
+
 def get_all_tasks():
     if tasks_collection is not None:
         return list(tasks_collection.find())
@@ -150,7 +155,8 @@ def get_main_keyboard():
         KeyboardButton("Daily Task"),
         KeyboardButton("Invite"),
         KeyboardButton("Balance"),
-        KeyboardButton("FAQ")
+        KeyboardButton("FAQ"),
+        KeyboardButton("✅ Submit Task")
     )
     return markup
 
@@ -165,7 +171,8 @@ def get_admin_keyboard():
         InlineKeyboardButton("🎁 Set Ref Bonus", callback_data="admin_ref_bonus")
     )
     markup.add(
-        InlineKeyboardButton("➕ Add Task", callback_data="admin_add_task")
+        InlineKeyboardButton("➕ Add Task", callback_data="admin_add_task"),
+        InlineKeyboardButton("👥 View All Users", callback_data="admin_view_users")
     )
     markup.add(
         InlineKeyboardButton("📢 Add/Change Channel", callback_data="admin_channel"),
@@ -270,6 +277,20 @@ def handle_callbacks(call):
     elif call.data == "admin_ref_bonus":
         msg = bot.send_message(user_id, f"Current Referral Bonus: {get_ref_bonus()} ৳\n\nSend the **new amount** (in ৳):", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_ref_bonus)
+    elif call.data == "admin_view_users":
+        send_all_users_report(user_id)
+    elif call.data.startswith("approve_"):
+        target_id = int(call.data.split("_")[1])
+        msg = bot.send_message(user_id, f"How much ৳ to reward User {target_id} for this task?")
+        bot.register_next_step_handler(msg, process_task_reward, target_id)
+        bot.edit_message_reply_markup(user_id, call.message.message_id, reply_markup=None)
+    elif call.data.startswith("reject_"):
+        target_id = int(call.data.split("_")[1])
+        try:
+            bot.send_message(target_id, "❌ Your recent task submission was **Rejected** by the Admin.", parse_mode="Markdown")
+        except:
+            pass
+        bot.edit_message_text("Task Rejected. User notified.", user_id, call.message.message_id, reply_markup=None)
 
 # --- Admin Step Functions ---
 def process_ban(message):
@@ -333,6 +354,67 @@ def process_ref_bonus(message):
     except ValueError:
         bot.reply_to(message, "Invalid amount. Must be a number.")
 
+def process_task_submission(message):
+    user_id = message.from_user.id
+    if not ADMIN_IDS:
+        return bot.reply_to(message, "❌ Cannot submit task. No Admin ID is configured in the bot.")
+    
+    bot.reply_to(message, "✅ Your task proof has been sent to the Admin for review! You will be notified soon.")
+    
+    markup = InlineKeyboardMarkup()
+    markup.add(
+        InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user_id}"),
+        InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user_id}")
+    )
+    
+    admin_id = ADMIN_IDS[0] # Send to the primary admin
+    username_text = f" (@{message.from_user.username})" if message.from_user.username else ""
+    caption = f"📩 **New Task Submission**\nFrom User ID: `{user_id}`{username_text}"
+    
+    try:
+        if message.photo:
+            bot.send_photo(admin_id, message.photo[-1].file_id, caption=caption, parse_mode="Markdown", reply_markup=markup)
+        else:
+            bot.send_message(admin_id, f"{caption}\n\n**Proof Text:**\n{message.text}", parse_mode="Markdown", reply_markup=markup)
+    except Exception as e:
+        print(f"Failed to send task to admin: {e}")
+
+def process_task_reward(message, target_id):
+    try:
+        amount = int(message.text)
+        user = get_user(target_id)
+        new_balance = user.get("balance", 0) + amount
+        update_user_balance(target_id, new_balance)
+        bot.reply_to(message, f"✅ User {target_id} has been rewarded {amount} ৳.")
+        try:
+            bot.send_message(target_id, f"🎉 **Task Approved!**\nYou have been rewarded **{amount} ৳**.", parse_mode="Markdown")
+        except:
+            pass
+    except ValueError:
+        bot.reply_to(message, "Invalid amount. Must be a number. Start over from the admin panel if needed.")
+
+def send_all_users_report(admin_id):
+    users = get_all_users()
+    if not users:
+        return bot.send_message(admin_id, "No users found.")
+    
+    report = "👥 **All Users Report**\n\n"
+    for u in users:
+        uid = u.get('_id', 'Unknown')
+        uname = f"@{u.get('username')}" if u.get('username') else "N/A"
+        bal = u.get('balance', 0)
+        ban = "Yes" if u.get('banned') else "No"
+        report += f"ID: `{uid}` | User: {uname} | Bal: {bal}৳ | Banned: {ban}\n"
+    
+    if len(report) > 4000:
+        with open("users_report.txt", "w", encoding="utf-8") as f:
+            f.write(report)
+        with open("users_report.txt", "rb") as f:
+            bot.send_document(admin_id, f, caption="Users Report is too long for a message, so here is the file.")
+        os.remove("users_report.txt")
+    else:
+        bot.send_message(admin_id, report, parse_mode="Markdown")
+
 
 # --- Text Message Handler ---
 @bot.message_handler(func=lambda message: True)
@@ -367,6 +449,9 @@ def handle_messages(message):
         bot.reply_to(message, f"💰 Balance: {balance} ৳")
     elif text == "FAQ":
         bot.reply_to(message, "❓ Frequently Asked Questions:\n1. How to earn? Complete tasks.\n2. How to invite? Use your invite link.")
+    elif text == "✅ Submit Task":
+        msg = bot.reply_to(message, "Please upload a screenshot or type your proof of completion to submit the task:")
+        bot.register_next_step_handler(msg, process_task_submission)
     else:
         bot.reply_to(message, "I didn't understand that. Please use the menu.", reply_markup=get_main_keyboard())
 
