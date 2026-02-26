@@ -38,10 +38,15 @@ db = load_db()
 def get_user(user_id, username=None):
     uid_str = str(user_id)
     if uid_str not in db["users"]:
-        db["users"][uid_str] = {"_id": user_id, "balance": 0, "banned": False, "username": username.lower() if username else None}
+        db["users"][uid_str] = {"_id": user_id, "balance": 0, "hold_balance": 0, "banned": False, "username": username.lower() if username else None}
         save_db()
     
     user = db["users"][uid_str]
+    # Retroactive fix for users without hold_balance
+    if "hold_balance" not in user:
+        user["hold_balance"] = 0
+        save_db()
+        
     if username and user.get("username") != username.lower():
         user["username"] = username.lower()
         save_db()
@@ -66,7 +71,15 @@ def update_user_balance(user_id, amount):
     if uid_str in db["users"]:
         db["users"][uid_str]["balance"] = amount
     else:
-        db["users"][uid_str] = {"_id": user_id, "balance": amount, "banned": False, "username": None}
+        db["users"][uid_str] = {"_id": user_id, "balance": amount, "hold_balance": 0, "banned": False, "username": None}
+    save_db()
+
+def update_user_hold_balance(user_id, amount):
+    uid_str = str(user_id)
+    if uid_str in db["users"]:
+        db["users"][uid_str]["hold_balance"] = amount
+    else:
+        db["users"][uid_str] = {"_id": user_id, "balance": 0, "hold_balance": amount, "banned": False, "username": None}
     save_db()
 
 def ban_user(user_id):
@@ -146,14 +159,17 @@ def get_admin_keyboard():
     )
     markup.add(
         InlineKeyboardButton("💰 Edit Balance", callback_data="admin_balance"),
-        InlineKeyboardButton("🎁 Set Ref Bonus", callback_data="admin_ref_bonus")
+        InlineKeyboardButton("💼 Edit Hold Balance", callback_data="admin_hold_balance")
     )
     markup.add(
-        InlineKeyboardButton("➕ Add Task", callback_data="admin_add_task"),
-        InlineKeyboardButton("👥 View All Users", callback_data="admin_view_users")
+        InlineKeyboardButton("🎁 Set Ref Bonus", callback_data="admin_ref_bonus"),
+        InlineKeyboardButton("➕ Add Task", callback_data="admin_add_task")
     )
     markup.add(
-        InlineKeyboardButton("📢 Add/Change Channel", callback_data="admin_channel"),
+        InlineKeyboardButton("👥 View All Users", callback_data="admin_view_users"),
+        InlineKeyboardButton("📢 Add/Change Channel", callback_data="admin_channel")
+    )
+    markup.add(
         InlineKeyboardButton("🗑️ Remove Channel", callback_data="admin_rm_channel")
     )
     return markup
@@ -249,6 +265,9 @@ def handle_callbacks(call):
     elif call.data == "admin_balance":
         msg = bot.send_message(user_id, "Send the User ID or @username to edit balance:")
         bot.register_next_step_handler(msg, process_balance_user_input)
+    elif call.data == "admin_hold_balance":
+        msg = bot.send_message(user_id, "Send the User ID or @username to edit **Hold Balance**:", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_hold_balance_user_input)
     elif call.data == "admin_channel":
         msg = bot.send_message(user_id, "Send the Channel Username (e.g., @mychannel):\n\n*Make sure this bot is added as an Admin in that channel first!*", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_add_channel)
@@ -314,6 +333,22 @@ def process_balance_amount(message, target_id):
         amount = int(message.text)
         update_user_balance(target_id, amount)
         bot.reply_to(message, f"Balance has been updated to {amount} ৳.")
+    except ValueError:
+        bot.reply_to(message, "Invalid amount. Must be a number.")
+
+def process_hold_balance_user_input(message):
+    target_user = get_user_by_input(message.text)
+    if target_user:
+        msg = bot.reply_to(message, f"Current Hold Balance: {target_user.get('hold_balance', 0)} ৳\nSend the new Hold Balance amount for {target_user.get('username') or target_user['_id']}:")
+        bot.register_next_step_handler(msg, process_hold_balance_amount, target_user['_id'])
+    else:
+        bot.reply_to(message, "User not found in database.")
+
+def process_hold_balance_amount(message, target_id):
+    try:
+        amount = int(message.text)
+        update_user_hold_balance(target_id, amount)
+        bot.reply_to(message, f"Hold Balance has been updated to {amount} ৳.")
     except ValueError:
         bot.reply_to(message, "Invalid amount. Must be a number.")
 
@@ -414,8 +449,9 @@ def send_all_users_report(admin_id):
             uid = u.get('_id', 'Unknown')
             uname = f"@{u.get('username')}" if u.get('username') else "N/A"
             bal = u.get('balance', 0)
+            h_bal = u.get('hold_balance', 0)
             ban = "Yes" if u.get('banned') else "No"
-            report += f"ID: `{uid}` | User: {uname} | Bal: {bal}৳ | Banned: {ban}\n"
+            report += f"ID: `{uid}`|User: {uname}|Bal: {bal}৳|Hold: {h_bal}৳|Ban: {ban}\n"
         
         if len(report) > 3500:
             file_path = f"users_report_{admin_id}.txt"
@@ -470,7 +506,8 @@ def handle_messages(message):
         bot.reply_to(message, f"🔗 Here is your personal invite link: https://t.me/{bot.get_me().username}?start={user_id}\n\nInvite friends to earn {get_ref_bonus()} ৳ per referral!")
     elif text == "Balance":
         balance = user.get("balance", 0)
-        bot.reply_to(message, f"💰 Balance: {balance} ৳")
+        hold = user.get("hold_balance", 0)
+        bot.reply_to(message, f"💰 **Available Balance:** {balance} ৳\n💼 **Hold Balance:** {hold} ৳", parse_mode="Markdown")
     elif text == "FAQ":
         bot.reply_to(message, "❓ Frequently Asked Questions:\n1. How to earn? Complete tasks.\n2. How to invite? Use your invite link.")
 
