@@ -238,7 +238,9 @@ def handle_admin(message):
     if not is_admin(message.from_user.id):
         return bot.reply_to(message, "You do not have permission to use this command.")
 
-    bot.reply_to(message, "⚙️ Welcome to the Admin Panel!\nChoose an action:", reply_markup=get_admin_keyboard())
+    db_status = "✅ Connected" if users_collection is not None else "❌ Offline (Memory Mode)"
+    msg_text = f"⚙️ Welcome to the Admin Panel!\n💾 DB Status: {db_status}\n\nChoose an action:"
+    bot.reply_to(message, msg_text, reply_markup=get_admin_keyboard())
 
 # --- Callback Handlers ---
 @bot.callback_query_handler(func=lambda call: True)
