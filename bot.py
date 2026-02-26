@@ -662,8 +662,8 @@ def handle_messages(message):
         hold = user.get("hold_balance", 0)
         profile_text = (
             f"🧑‍💻 **My Profile ID:** `{user_id}`\n\n"
-            f"💸 **Available ব্যালেন্স:** {balance} ৳\n"
-            f"💼 **Hold ব্যালেন্স:** {hold} ৳\n\n"
+            f"💰 **Available Balance:** {balance} ৳\n"
+            f"💼 **Hold Balance:** {hold} ৳\n\n"
             f"💸 **মিনিমাম উইথড্র মাএ ২০ টাকা** 💸\n"
             f"🧑‍💻 **পেমেন্ট বিকাশ/নগদ** 🏧"
         )
