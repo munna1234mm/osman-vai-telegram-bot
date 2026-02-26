@@ -3,135 +3,103 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton, Update, InlineKey
 import os
 from fastapi import FastAPI, Request
 import uvicorn
-from pymongo import MongoClient
-import certifi
+import json
 
-# --- Configurations ---
-TOKEN = os.getenv("BOT_TOKEN", "8243932163:AAFRMmbcIJqQgbQCrSpJIiHpKesHS5mH-LI")
-bot = telebot.TeleBot(TOKEN)
-app = FastAPI()
+DB_FILE = "database.json"
 
-ADMIN_IDS = [] 
+def load_db():
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading DB: {e}")
+    return {"users": {}, "settings": {}, "tasks": []}
 
-MONGO_URL = os.getenv("MONGO_URL", "mongodb+srv://botadmin:<db_password>@cluster0.hgb2c9e.mongodb.net/?appName=Cluster0")
-try:
-    client = MongoClient(MONGO_URL, tlsCAFile=certifi.where())
-    db = client['telegram_bot']
-    users_collection = db['users']
-    settings_collection = db['settings']
-    tasks_collection = db['tasks']
-    print("Connected to MongoDB successfully!")
-except Exception as e:
-    print(f"Error connecting to MongoDB: {e}")
-    users_collection = None
-    settings_collection = None
-    tasks_collection = None
+def save_db():
+    try:
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(db, f, indent=4)
+    except Exception as e:
+        print(f"Error saving DB: {e}")
 
-# Fallback Memory
-memory_banned = set()
-memory_balances = {}
-memory_channel = None
-memory_tasks = []
-memory_ref_bonus = 0
+db = load_db()
+
+
 
 # --- Helper Functions for Database ---
 def get_user(user_id, username=None):
-    if users_collection is not None:
-        user = users_collection.find_one({"_id": user_id})
-        update_data = {}
-        if username:
-            update_data["username"] = username.lower()
-            
-        if not user:
-            user = {"_id": user_id, "balance": 0, "banned": False}
-            if username:
-                user["username"] = username.lower()
-            users_collection.insert_one(user)
-        elif username and user.get("username") != username.lower():
-            users_collection.update_one({"_id": user_id}, {"$set": {"username": username.lower()}})
-            user["username"] = username.lower()
-        return user
-    return {"_id": user_id, "balance": memory_balances.get(user_id, 0), "banned": user_id in memory_banned, "username": username.lower() if username else None}
+    uid_str = str(user_id)
+    if uid_str not in db["users"]:
+        db["users"][uid_str] = {"_id": user_id, "balance": 0, "banned": False, "username": username.lower() if username else None}
+        save_db()
+    
+    user = db["users"][uid_str]
+    if username and user.get("username") != username.lower():
+        user["username"] = username.lower()
+        save_db()
+        
+    return user
 
 def get_user_by_input(input_str):
     """ Tries to find a user by ID or username """
-    if users_collection is not None:
-        try:
-            # Try by ID first
-            uid = int(input_str)
-            return users_collection.find_one({"_id": uid})
-        except ValueError:
-            # If not a number, try by username
-            clean_username = input_str.replace('@', '').lower().strip()
-            return users_collection.find_one({"username": clean_username})
+    try:
+        uid_str = str(int(input_str))
+        if uid_str in db["users"]:
+            return db["users"][uid_str]
+    except ValueError:
+        clean_username = input_str.replace('@', '').lower().strip()
+        for user in db["users"].values():
+            if user.get("username") == clean_username:
+                return user
     return None
 
 def update_user_balance(user_id, amount):
-    if users_collection is not None:
-        users_collection.update_one({"_id": user_id}, {"$set": {"balance": amount}}, upsert=True)
+    uid_str = str(user_id)
+    if uid_str in db["users"]:
+        db["users"][uid_str]["balance"] = amount
     else:
-        memory_balances[user_id] = amount
+        db["users"][uid_str] = {"_id": user_id, "balance": amount, "banned": False, "username": None}
+    save_db()
 
 def ban_user(user_id):
-    if users_collection is not None:
-        users_collection.update_one({"_id": user_id}, {"$set": {"banned": True}}, upsert=True)
-    else:
-        memory_banned.add(user_id)
+    uid_str = str(user_id)
+    if uid_str in db["users"]:
+        db["users"][uid_str]["banned"] = True
+        save_db()
 
 def unban_user(user_id):
-    if users_collection is not None:
-        users_collection.update_one({"_id": user_id}, {"$set": {"banned": False}}, upsert=True)
-    else:
-        if user_id in memory_banned:
-            memory_banned.remove(user_id)
+    uid_str = str(user_id)
+    if uid_str in db["users"]:
+        db["users"][uid_str]["banned"] = False
+        save_db()
 
 def get_mandatory_channel():
-    if settings_collection is not None:
-        setting = settings_collection.find_one({"_id": "mandatory_channel"})
-        if setting:
-            return setting.get("channel_id")
-    return memory_channel
+    return db["settings"].get("mandatory_channel")
 
 def set_mandatory_channel(channel_id):
-    global memory_channel
-    if settings_collection is not None:
-        settings_collection.update_one({"_id": "mandatory_channel"}, {"$set": {"channel_id": channel_id}}, upsert=True)
-    else:
-        memory_channel = channel_id
+    db["settings"]["mandatory_channel"] = channel_id
+    save_db()
 
 def get_ref_bonus():
-    if settings_collection is not None:
-        setting = settings_collection.find_one({"_id": "referral_bonus"})
-        if setting:
-            return setting.get("amount", 0)
-    return memory_ref_bonus
+    return db["settings"].get("referral_bonus", 0)
 
 def set_ref_bonus(amount):
-    global memory_ref_bonus
-    if settings_collection is not None:
-        settings_collection.update_one({"_id": "referral_bonus"}, {"$set": {"amount": amount}}, upsert=True)
-    else:
-        memory_ref_bonus = amount
+    db["settings"]["referral_bonus"] = amount
+    save_db()
 
 def add_task(title, url, limit):
-    task_doc = {"title": title, "url": url, "limit": limit, "completed_count": 0}
-    if tasks_collection is not None:
-        tasks_collection.insert_one(task_doc)
-    else:
-        # For memory mode, need to add a string ID since mongo usually handles _id
-        import uuid
-        task_doc["_id"] = str(uuid.uuid4())
-        memory_tasks.append(task_doc)
+    import uuid
+    task_id = str(uuid.uuid4())
+    task_doc = {"_id": task_id, "title": title, "url": url, "limit": limit, "completed_count": 0}
+    db["tasks"].append(task_doc)
+    save_db()
 
 def get_all_users():
-    if users_collection is not None:
-        return list(users_collection.find())
-    return [{"_id": k, "balance": v, "banned": k in memory_banned} for k, v in memory_balances.items()]
+    return list(db["users"].values())
 
 def get_all_tasks():
-    if tasks_collection is not None:
-        return list(tasks_collection.find())
-    return memory_tasks
+    return db["tasks"]
 
 def is_admin(user_id):
     if not ADMIN_IDS:
@@ -149,7 +117,7 @@ def check_join(user_id):
         return True
     except Exception as e:
         print(f"Error checking channel membership: {e}")
-        return True 
+        return True  
 
 # --- Keyboards ---
 def get_main_keyboard():
@@ -212,10 +180,9 @@ def send_welcome(message):
     
     # Check if this is a new user for referral
     is_new = False
-    if users_collection is not None:
-        existing = users_collection.find_one({"_id": user_id})
-        if not existing:
-            is_new = True
+    uid_str = str(user_id)
+    if uid_str not in db["users"]:
+        is_new = True
 
     user = get_user(user_id, username)
     if user.get("banned"):
@@ -247,8 +214,7 @@ def handle_admin(message):
     if not is_admin(message.from_user.id):
         return bot.reply_to(message, "You do not have permission to use this command.")
 
-    db_status = "✅ Connected" if users_collection is not None else "❌ Offline (Memory Mode)"
-    msg_text = f"⚙️ Welcome to the Admin Panel!\n💾 DB Status: {db_status}\n\nChoose an action:"
+    msg_text = f"⚙️ Welcome to the Admin Panel!\n💾 DB Status: JSON Local (Active)\n\nChoose an action:"
     bot.reply_to(message, msg_text, reply_markup=get_admin_keyboard())
 
 # --- Callback Handlers ---
@@ -419,19 +385,13 @@ def process_task_reward(message, target_id, task_id):
             pass
             
         # Update Task Completion Count
-        if tasks_collection is not None:
-            from bson.objectid import ObjectId
-            try:
-                task = tasks_collection.find_one({"_id": ObjectId(task_id)})
-                if task:
-                    new_count = task.get("completed_count", 0) + 1
-                    limit = task.get("limit", 0)
-                    if new_count >= limit:
-                        tasks_collection.delete_one({"_id": ObjectId(task_id)})
-                    else:
-                        tasks_collection.update_one({"_id": ObjectId(task_id)}, {"$set": {"completed_count": new_count}})
-            except Exception as e:
-                print(f"Error updating task limit: {e}")
+        for i, task in enumerate(db["tasks"]):
+            if task["_id"] == task_id:
+                task["completed_count"] += 1
+                if task["completed_count"] >= task.get("limit", 0):
+                    del db["tasks"][i]
+                save_db()
+                break
                 
     except ValueError:
         bot.reply_to(message, "Invalid amount. Must be a number. Start over from the admin panel if needed.")
