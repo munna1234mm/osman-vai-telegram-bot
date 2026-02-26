@@ -113,11 +113,15 @@ def set_ref_bonus(amount):
     else:
         memory_ref_bonus = amount
 
-def add_task(title, url):
+def add_task(title, url, limit):
+    task_doc = {"title": title, "url": url, "limit": limit, "completed_count": 0}
     if tasks_collection is not None:
-        tasks_collection.insert_one({"title": title, "url": url})
+        tasks_collection.insert_one(task_doc)
     else:
-        memory_tasks.append({"title": title, "url": url})
+        # For memory mode, need to add a string ID since mongo usually handles _id
+        import uuid
+        task_doc["_id"] = str(uuid.uuid4())
+        memory_tasks.append(task_doc)
 
 def get_all_users():
     if users_collection is not None:
@@ -155,8 +159,7 @@ def get_main_keyboard():
         KeyboardButton("Daily Task"),
         KeyboardButton("Invite"),
         KeyboardButton("Balance"),
-        KeyboardButton("FAQ"),
-        KeyboardButton("✅ Submit Task")
+        KeyboardButton("FAQ")
     )
     return markup
 
@@ -193,6 +196,12 @@ def get_tasks_keyboard():
     tasks = get_all_tasks()
     for task in tasks:
         markup.add(InlineKeyboardButton(task['title'], url=task['url']))
+    return markup
+
+def get_single_task_keyboard(task_id, url):
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("🔗 Go to Task", url=url))
+    markup.add(InlineKeyboardButton("✅ Submit This Task", callback_data=f"submit_task_{task_id}"))
     return markup
 
 # --- Core Command Handlers ---
@@ -281,13 +290,21 @@ def handle_callbacks(call):
         bot.register_next_step_handler(msg, process_ref_bonus)
     elif call.data == "admin_view_users":
         send_all_users_report(user_id)
-    elif call.data.startswith("approve_"):
-        target_id = int(call.data.split("_")[1])
+    elif call.data.startswith("submit_task_"):
+        task_id = call.data.split("submit_task_")[1]
+        msg = bot.send_message(user_id, "Please upload a screenshot or type your proof of completion for this task:")
+        bot.register_next_step_handler(msg, process_task_submission, task_id)
+    elif call.data.startswith("app_"):
+        # Format: app_USERID_TASKID
+        parts = call.data.split("_")
+        target_id = int(parts[1])
+        task_id = parts[2]
         msg = bot.send_message(user_id, f"How much ৳ to reward User {target_id} for this task?")
-        bot.register_next_step_handler(msg, process_task_reward, target_id)
+        bot.register_next_step_handler(msg, process_task_reward, target_id, task_id)
         bot.edit_message_reply_markup(user_id, call.message.message_id, reply_markup=None)
-    elif call.data.startswith("reject_"):
-        target_id = int(call.data.split("_")[1])
+    elif call.data.startswith("rej_"):
+        parts = call.data.split("_")
+        target_id = int(parts[1])
         try:
             bot.send_message(target_id, "❌ Your recent task submission was **Rejected** by the Admin.", parse_mode="Markdown")
         except:
@@ -345,8 +362,16 @@ def process_task_url(message, title):
     if not url.startswith("http"):
         return bot.reply_to(message, "Invalid URL. Please start again from /admin and provide a valid link (e.g., https://youtube.com).")
     
-    add_task(title, url)
-    bot.reply_to(message, f"✅ Task added successfully!\nTitle: {title}\nURL: {url}")
+    msg = bot.reply_to(message, "How many users can complete this task? (Enter a number for the limit):")
+    bot.register_next_step_handler(msg, process_task_limit, title, url)
+
+def process_task_limit(message, title, url):
+    try:
+        limit = int(message.text.strip())
+        add_task(title, url, limit)
+        bot.reply_to(message, f"✅ Task added successfully!\nTitle: {title}\nURL: {url}\nLimit: {limit} users")
+    except ValueError:
+        bot.reply_to(message, "Invalid number. Please try adding the task again from /admin.")
 
 def process_ref_bonus(message):
     try:
@@ -356,7 +381,7 @@ def process_ref_bonus(message):
     except ValueError:
         bot.reply_to(message, "Invalid amount. Must be a number.")
 
-def process_task_submission(message):
+def process_task_submission(message, task_id):
     user_id = message.from_user.id
     if not ADMIN_IDS:
         return bot.reply_to(message, "❌ Cannot submit task. No Admin ID is configured in the bot.")
@@ -365,13 +390,13 @@ def process_task_submission(message):
     
     markup = InlineKeyboardMarkup()
     markup.add(
-        InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user_id}"),
-        InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user_id}")
+        InlineKeyboardButton("✅ Approve", callback_data=f"app_{user_id}_{task_id}"),
+        InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{task_id}")
     )
     
     admin_id = ADMIN_IDS[0] # Send to the primary admin
     username_text = f" (@{message.from_user.username})" if message.from_user.username else ""
-    caption = f"📩 **New Task Submission**\nFrom User ID: `{user_id}`{username_text}"
+    caption = f"📩 **New Task Submission**\nFrom User ID: `{user_id}`{username_text}\nTask ID: `{task_id}`"
     
     try:
         if message.photo:
@@ -381,7 +406,7 @@ def process_task_submission(message):
     except Exception as e:
         print(f"Failed to send task to admin: {e}")
 
-def process_task_reward(message, target_id):
+def process_task_reward(message, target_id, task_id):
     try:
         amount = int(message.text)
         user = get_user(target_id)
@@ -392,6 +417,22 @@ def process_task_reward(message, target_id):
             bot.send_message(target_id, f"🎉 **Task Approved!**\nYou have been rewarded **{amount} ৳**.", parse_mode="Markdown")
         except:
             pass
+            
+        # Update Task Completion Count
+        if tasks_collection is not None:
+            from bson.objectid import ObjectId
+            try:
+                task = tasks_collection.find_one({"_id": ObjectId(task_id)})
+                if task:
+                    new_count = task.get("completed_count", 0) + 1
+                    limit = task.get("limit", 0)
+                    if new_count >= limit:
+                        tasks_collection.delete_one({"_id": ObjectId(task_id)})
+                    else:
+                        tasks_collection.update_one({"_id": ObjectId(task_id)}, {"$set": {"completed_count": new_count}})
+            except Exception as e:
+                print(f"Error updating task limit: {e}")
+                
     except ValueError:
         bot.reply_to(message, "Invalid amount. Must be a number. Start over from the admin panel if needed.")
 
@@ -442,11 +483,20 @@ def handle_messages(message):
 
     text = message.text
     if text == "One Task":
+        bot.reply_to(message, "📝 Available Tasks:")
         tasks = get_all_tasks()
         if not tasks:
-            bot.reply_to(message, "📝 There are no tasks available right now.")
+            bot.send_message(message.chat.id, "There are no tasks available right now.")
         else:
-            bot.reply_to(message, "📝 Available Tasks:", reply_markup=get_tasks_keyboard())
+            for task in tasks:
+                task_id = str(task.get('_id', ''))
+                title = task.get('title', 'Task')
+                url = task.get('url', '')
+                limit = task.get('limit', 0)
+                completed = task.get('completed_count', 0)
+                
+                text = f"📌 **{title}**\n👥 Slots: {completed}/{limit} completed"
+                bot.send_message(message.chat.id, text, reply_markup=get_single_task_keyboard(task_id, url), parse_mode="Markdown")
     elif text == "Daily Task":
         bot.reply_to(message, "📅 You selected: Daily Task\nComplete your daily task to earn rewards!")
     elif text == "Invite":
@@ -456,9 +506,7 @@ def handle_messages(message):
         bot.reply_to(message, f"💰 Balance: {balance} ৳")
     elif text == "FAQ":
         bot.reply_to(message, "❓ Frequently Asked Questions:\n1. How to earn? Complete tasks.\n2. How to invite? Use your invite link.")
-    elif text == "✅ Submit Task":
-        msg = bot.reply_to(message, "Please upload a screenshot or type your proof of completion to submit the task:")
-        bot.register_next_step_handler(msg, process_task_submission)
+
     else:
         bot.reply_to(message, "I didn't understand that. Please use the menu.", reply_markup=get_main_keyboard())
 
