@@ -146,11 +146,22 @@ def remove_payment_method(name):
         db["settings"]["payment_methods"] = methods
         save_db()
 
-def add_task(title, url, limit):
+def add_task(title, url, limit, tutorial_url=None):
     import uuid
     task_id = str(uuid.uuid4())
-    task_doc = {"_id": task_id, "title": title, "url": url, "limit": limit, "completed_count": 0}
+    task_doc = {
+        "_id": task_id, 
+        "title": title, 
+        "url": url, 
+        "limit": limit, 
+        "completed_count": 0,
+        "tutorial_url": tutorial_url
+    }
     db["tasks"].append(task_doc)
+    save_db()
+
+def delete_task(task_id):
+    db["tasks"] = [t for t in db["tasks"] if t["_id"] != task_id]
     save_db()
 
 def get_all_users():
@@ -213,6 +224,9 @@ def get_admin_keyboard():
         InlineKeyboardButton("📢 Add/Change Channel", callback_data="admin_channel"),
         InlineKeyboardButton("🗑️ Remove Channel", callback_data="admin_rm_channel")
     )
+    markup.add(
+        InlineKeyboardButton("🗑️ Remove Task", callback_data="admin_remove_task")
+    )
     return markup
 
 def get_join_keyboard():
@@ -230,9 +244,11 @@ def get_tasks_keyboard():
         markup.add(InlineKeyboardButton(task['title'], url=task['url']))
     return markup
 
-def get_single_task_keyboard(task_id, url):
+def get_single_task_keyboard(task_id, url, tutorial_url=None):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("🔗 Go to Task", url=url))
+    if tutorial_url:
+        markup.add(InlineKeyboardButton("📺 Tutorial", url=tutorial_url))
     markup.add(InlineKeyboardButton("✅ Submit This Task", callback_data=f"submit_task_{task_id}"))
     return markup
 
@@ -358,6 +374,19 @@ def handle_callbacks(call):
             bot.send_message(target_id, "❌ Your recent withdrawal request was **Rejected** by the Admin.", parse_mode="Markdown")
         except:
             pass
+    elif call.data == "admin_remove_task":
+        tasks = get_all_tasks()
+        if not tasks:
+            return bot.answer_callback_query(call.id, "No tasks to remove.")
+        markup = InlineKeyboardMarkup()
+        for t in tasks:
+            markup.add(InlineKeyboardButton(f"🗑️ {t['title']}", callback_data=f"del_task_{t['_id']}"))
+        bot.send_message(user_id, "Select a task to **Permanently Delete**:", parse_mode="Markdown", reply_markup=markup)
+    elif call.data.startswith("del_task_"):
+        task_id = call.data.replace("del_task_", "")
+        delete_task(task_id)
+        bot.answer_callback_query(call.id, "Task Deleted!")
+        bot.edit_message_text("✅ Task has been removed.", user_id, call.message.message_id)
     elif call.data == "admin_channel":
         msg = bot.send_message(user_id, "Send the Channel Username (e.g., @mychannel):\n\n*Make sure this bot is added as an Admin in that channel first!*", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_add_channel)
@@ -469,10 +498,21 @@ def process_task_url(message, title):
 def process_task_limit(message, title, url):
     try:
         limit = int(message.text.strip())
-        add_task(title, url, limit)
-        bot.reply_to(message, f"✅ Task added successfully!\nTitle: {title}\nURL: {url}\nLimit: {limit} users")
+        msg = bot.reply_to(message, "Tutorial Link (Optional):\n\nSend the URL (e.g. YouTube video) or type 'skip':")
+        bot.register_next_step_handler(msg, process_task_tutorial, title, url, limit)
     except ValueError:
         bot.reply_to(message, "Invalid number. Please try adding the task again from /admin.")
+
+def process_task_tutorial(message, title, url, limit):
+    tutorial_url = message.text.strip()
+    if tutorial_url.lower() == 'skip':
+        tutorial_url = None
+    elif not tutorial_url.startswith("http"):
+        return bot.reply_to(message, "Invalid URL. Please send a valid link starting with http:// or https://, or type 'skip'.")
+    
+    add_task(title, url, limit, tutorial_url)
+    tut_text = f"\nTutorial: {tutorial_url}" if tutorial_url else ""
+    bot.reply_to(message, f"✅ Task added successfully!\nTitle: {title}\nURL: {url}\nLimit: {limit} users{tut_text}")
 
 def process_ref_bonus(message):
     try:
@@ -642,11 +682,12 @@ def handle_messages(message):
                 task_id = str(task.get('_id', ''))
                 title = task.get('title', 'Task')
                 url = task.get('url', '')
+                tut_url = task.get('tutorial_url')
                 limit = task.get('limit', 0)
                 completed = task.get('completed_count', 0)
                 
                 text = f"📌 **{title}**\n👥 Slots: {completed}/{limit} completed"
-                bot.send_message(message.chat.id, text, reply_markup=get_single_task_keyboard(task_id, url), parse_mode="Markdown")
+                bot.send_message(message.chat.id, text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="Markdown")
     elif text == "Daily Task":
         bot.reply_to(message, "📅 You selected: Daily Task\nComplete your daily task to earn rewards!")
     elif text == "Invite":
