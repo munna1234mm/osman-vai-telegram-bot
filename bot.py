@@ -38,13 +38,31 @@ db = load_db()
 def get_user(user_id, username=None):
     uid_str = str(user_id)
     if uid_str not in db["users"]:
-        db["users"][uid_str] = {"_id": user_id, "balance": 0, "hold_balance": 0, "banned": False, "username": username.lower() if username else None}
+        db["users"][uid_str] = {
+            "_id": user_id, 
+            "balance": 0, 
+            "hold_balance": 0, 
+            "completed_tasks": 0,
+            "rejected_tasks": 0,
+            "banned": False, 
+            "username": username.lower() if username else None
+        }
         save_db()
     
     user = db["users"][uid_str]
-    # Retroactive fix for users without hold_balance
+    # Retroactive fix for users without these fields
+    needs_save = False
     if "hold_balance" not in user:
         user["hold_balance"] = 0
+        needs_save = True
+    if "completed_tasks" not in user:
+        user["completed_tasks"] = 0
+        needs_save = True
+    if "rejected_tasks" not in user:
+        user["rejected_tasks"] = 0
+        needs_save = True
+    
+    if needs_save:
         save_db()
         
     if username and user.get("username") != username.lower():
@@ -108,6 +126,26 @@ def set_ref_bonus(amount):
     db["settings"]["referral_bonus"] = amount
     save_db()
 
+def get_payment_methods():
+    if "payment_methods" not in db["settings"]:
+        db["settings"]["payment_methods"] = ["Bkash", "Nagad"]
+        save_db()
+    return db["settings"]["payment_methods"]
+
+def add_payment_method(name):
+    methods = get_payment_methods()
+    if name not in methods:
+        methods.append(name)
+        db["settings"]["payment_methods"] = methods
+        save_db()
+
+def remove_payment_method(name):
+    methods = get_payment_methods()
+    if name in methods:
+        methods.remove(name)
+        db["settings"]["payment_methods"] = methods
+        save_db()
+
 def add_task(title, url, limit):
     import uuid
     task_id = str(uuid.uuid4())
@@ -147,6 +185,7 @@ def get_main_keyboard():
         KeyboardButton("Daily Task"),
         KeyboardButton("Invite"),
         KeyboardButton("Balance"),
+        KeyboardButton("📊 Status"),
         KeyboardButton("FAQ")
     )
     return markup
@@ -166,10 +205,11 @@ def get_admin_keyboard():
         InlineKeyboardButton("➕ Add Task", callback_data="admin_add_task")
     )
     markup.add(
-        InlineKeyboardButton("👥 View All Users", callback_data="admin_view_users"),
-        InlineKeyboardButton("📢 Add/Change Channel", callback_data="admin_channel")
+        InlineKeyboardButton("⚙️ Manage Methods", callback_data="admin_methods"),
+        InlineKeyboardButton("👥 View All Users", callback_data="admin_view_users")
     )
     markup.add(
+        InlineKeyboardButton("📢 Add/Change Channel", callback_data="admin_channel"),
         InlineKeyboardButton("🗑️ Remove Channel", callback_data="admin_rm_channel")
     )
     return markup
@@ -268,6 +308,55 @@ def handle_callbacks(call):
     elif call.data == "admin_hold_balance":
         msg = bot.send_message(user_id, "Send the User ID or @username to edit **Hold Balance**:", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_hold_balance_user_input)
+    elif call.data == "admin_methods":
+        show_manage_methods(user_id)
+    elif call.data.startswith("rm_method_"):
+        method = call.data.replace("rm_method_", "")
+        remove_payment_method(method)
+        show_manage_methods(user_id)
+    elif call.data == "admin_add_method":
+        msg = bot.send_message(user_id, "Send the name of the new Payment Method (e.g., Rocket):")
+        bot.register_next_step_handler(msg, process_add_method)
+    elif call.data == "user_withdraw":
+        methods = get_payment_methods()
+        if not methods:
+            return bot.answer_callback_query(call.id, "No payment methods available. Contact Admin.")
+        markup = InlineKeyboardMarkup()
+        for m in methods:
+            markup.add(InlineKeyboardButton(m, callback_data=f"wd_method_{m}"))
+        bot.edit_message_text("💳 Select your preferred payment method:", user_id, call.message.message_id, reply_markup=markup)
+    elif call.data.startswith("wd_method_"):
+        method = call.data.replace("wd_method_", "")
+        msg = bot.edit_message_text(f"Selected: {method}\n\nSend your withdrawal Number (e.g., your Bkash Number):", user_id, call.message.message_id)
+        bot.register_next_step_handler(msg, process_withdraw_number, method)
+    elif call.data.startswith("wd_app_"):
+        # Format: wd_app_USERID_AMOUNT_METHOD_NUMBER
+        parts = call.data.split("_")
+        target_id = int(parts[2])
+        amount = int(parts[3])
+        method = parts[4]
+        number = parts[5]
+        
+        user = get_user(target_id)
+        if user.get("balance", 0) < amount:
+            return bot.answer_callback_query(call.id, "User does not have enough balance anymore!", show_alert=True)
+        
+        new_balance = user["balance"] - amount
+        update_user_balance(target_id, new_balance)
+        
+        bot.edit_message_text(f"✅ Withdrawal Approved!\nUser: {target_id}\nAmount: {amount}৳\nMethod: {method}\nNumber: {number}", user_id, call.message.message_id, reply_markup=None)
+        try:
+            bot.send_message(target_id, f"✅ **Withdrawal Approved!**\n{amount} ৳ has been sent to your {method} account ({number}).", parse_mode="Markdown")
+        except:
+            pass
+    elif call.data.startswith("wd_rej_"):
+        parts = call.data.split("_")
+        target_id = int(parts[2])
+        bot.edit_message_text("❌ Withdrawal Request Rejected.", user_id, call.message.message_id, reply_markup=None)
+        try:
+            bot.send_message(target_id, "❌ Your recent withdrawal request was **Rejected** by the Admin.", parse_mode="Markdown")
+        except:
+            pass
     elif call.data == "admin_channel":
         msg = bot.send_message(user_id, "Send the Channel Username (e.g., @mychannel):\n\n*Make sure this bot is added as an Admin in that channel first!*", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_add_channel)
@@ -297,6 +386,9 @@ def handle_callbacks(call):
     elif call.data.startswith("rej_"):
         parts = call.data.split("_")
         target_id = int(parts[1])
+        user = get_user(target_id)
+        user["rejected_tasks"] = user.get("rejected_tasks", 0) + 1
+        save_db()
         try:
             bot.send_message(target_id, "❌ Your recent task submission was **Rejected** by the Admin.", parse_mode="Markdown")
         except:
@@ -466,6 +558,60 @@ def send_all_users_report(admin_id):
         print(f"Error generating users report: {e}")
         bot.send_message(admin_id, f"❌ Error generating report: {e}")
 
+def show_manage_methods(admin_id):
+    methods = get_payment_methods()
+    markup = InlineKeyboardMarkup()
+    for m in methods:
+        markup.add(InlineKeyboardButton(f"❌ Remove {m}", callback_data=f"rm_method_{m}"))
+    markup.add(InlineKeyboardButton("➕ Add Method", callback_data="admin_add_method"))
+    markup.add(InlineKeyboardButton("🔙 Back", callback_data="back_to_admin"))
+    
+    text = "⚙️ **Manage Payment Methods**\n\nCurrent methods:"
+    if not methods:
+        text += "\nNone"
+    else:
+        for m in methods:
+            text += f"\n- {m}"
+    
+    bot.send_message(admin_id, text, parse_mode="Markdown", reply_markup=markup)
+
+def process_add_method(message):
+    name = message.text.strip()
+    add_payment_method(name)
+    bot.reply_to(message, f"✅ Added '{name}' to payment methods.")
+    show_manage_methods(message.from_user.id)
+
+def process_withdraw_number(message, method):
+    user_id = message.from_user.id
+    number = message.text.strip()
+    msg = bot.send_message(user_id, f"Method: {method}\nNumber: {number}\n\nHow much ৳ do you want to withdraw?")
+    bot.register_next_step_handler(msg, process_withdraw_amount, method, number)
+
+def process_withdraw_amount(message, method, number):
+    user_id = message.from_user.id
+    try:
+        amount = int(message.text.strip())
+        user = get_user(user_id)
+        if amount < 10:
+            return bot.reply_to(message, "❌ Minimum withdrawal is 10 ৳.")
+        if user["balance"] < amount:
+            return bot.reply_to(message, "❌ Insufficient balance!")
+
+        bot.reply_to(message, "✅ Your withdrawal request has been sent to the Admin!")
+        
+        # Notify Admin
+        admin_id = ADMIN_IDS[0] if ADMIN_IDS else user_id
+        markup = InlineKeyboardMarkup()
+        markup.add(
+            InlineKeyboardButton("✅ Approve", callback_data=f"wd_app_{user_id}_{amount}_{method}_{number}"),
+            InlineKeyboardButton("❌ Reject", callback_data=f"wd_rej_{user_id}")
+        )
+        caption = f"💰 **New Withdrawal Request**\nUser: `{user_id}`\nAmount: {amount}৳\nMethod: {method}\nNumber: `{number}`"
+        bot.send_message(admin_id, caption, parse_mode="Markdown", reply_markup=markup)
+        
+    except ValueError:
+        bot.reply_to(message, "Invalid amount. Please try again.")
+
 
 # --- Text Message Handler ---
 @bot.message_handler(func=lambda message: True)
@@ -507,7 +653,13 @@ def handle_messages(message):
     elif text == "Balance":
         balance = user.get("balance", 0)
         hold = user.get("hold_balance", 0)
-        bot.reply_to(message, f"💰 **Available Balance:** {balance} ৳\n💼 **Hold Balance:** {hold} ৳", parse_mode="Markdown")
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("💳 Withdraw", callback_data="user_withdraw"))
+        bot.reply_to(message, f"💰 **Available Balance:** {balance} ৳\n💼 **Hold Balance:** {hold} ৳", parse_mode="Markdown", reply_markup=markup)
+    elif text == "📊 Status":
+        comp = user.get("completed_tasks", 0)
+        rej = user.get("rejected_tasks", 0)
+        bot.reply_to(message, f"📊 **Your Task Activity:**\n\n✅ Completed: {comp}\n❌ Rejected: {rej}", parse_mode="Markdown")
     elif text == "FAQ":
         bot.reply_to(message, "❓ Frequently Asked Questions:\n1. How to earn? Complete tasks.\n2. How to invite? Use your invite link.")
 
