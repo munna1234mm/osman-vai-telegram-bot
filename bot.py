@@ -13,7 +13,7 @@ app = FastAPI()
 
 ADMIN_IDS = [] 
 
-MONGO_URL = os.getenv("MONGO_URL", "mongodb+srv://testuser:testpass123@cluster0.exmple.mongodb.net/?retryWrites=true&w=majority")
+MONGO_URL = os.getenv("MONGO_URL", "mongodb+srv://botadmin:<db_password>@cluster0.hgb2c9e.mongodb.net/?appName=Cluster0")
 try:
     client = MongoClient(MONGO_URL, tlsCAFile=certifi.where())
     db = client['telegram_bot']
