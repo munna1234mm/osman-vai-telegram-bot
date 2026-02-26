@@ -2,7 +2,7 @@ import telebot
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton, Update, InlineKeyboardMarkup, InlineKeyboardButton
 import os
 from fastapi import FastAPI, Request
-import yaml  # In case we need it, but using env is better
+import uvicorn
 from pymongo import MongoClient
 import certifi
 
