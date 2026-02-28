@@ -204,13 +204,13 @@ def check_join(user_id):
 def get_main_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
-        KeyboardButton("One Task"),
-        KeyboardButton("Daily Task"),
-        KeyboardButton("Invite"),
-        KeyboardButton("Withdraw"),
-        KeyboardButton("My Profile"),
+        KeyboardButton("📝 One Task"),
+        KeyboardButton("🎁 Daily Task"),
+        KeyboardButton("👥 Invite"),
+        KeyboardButton("💳 Withdraw"),
+        KeyboardButton("🧑‍💻 My Profile"),
         KeyboardButton("📊 Status"),
-        KeyboardButton("FAQ")
+        KeyboardButton("❓ FAQ")
     )
     return markup
 
@@ -728,7 +728,8 @@ def handle_messages(message):
         )
 
     text = message.text
-    if text == "One Task":
+    text = message.text
+    if text == "📝 One Task":
         tasks = get_all_tasks()
         if not tasks:
             bot.reply_to(message, "**📝 বর্তমান কোনো কাজ নেই**", parse_mode="Markdown")
@@ -742,28 +743,28 @@ def handle_messages(message):
                 limit = task.get('limit', 0)
                 completed = task.get('completed_count', 0)
                 
-                text = f"📌 **{title}**\n👥 Slots: {completed}/{limit} completed"
-                bot.send_message(message.chat.id, text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="Markdown")
-    elif text == "Daily Task":
+                msg_text = f"📌 **{title}**\n👥 Slots: {completed}/{limit} completed"
+                bot.send_message(message.chat.id, msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="Markdown")
+    elif text == "🎁 Daily Task":
         bot.reply_to(message, "**📝 বর্তমান কোনো কাজ নেই**", parse_mode="Markdown")
-    elif text == "Invite":
+    elif text == "👥 Invite":
         active = user.get("active_referrals", 0)
         inactive = user.get("inactive_referrals", 0)
         invite_msg = (
-            f"✅ Active {active}.0 রেফার\n"
-            f"❌ Inactive {inactive}.0 রেফার\n"
-            f"👥 প্রতি রেফার ১০ টাকা\n\n"
-            f"👥 Invite লিংক 👇\n"
+            f"✅ **Active {active}.0 রেফার**\n"
+            f"❌ **Inactive {inactive}.0 রেফার**\n"
+            f"👥 **প্রতি রেফার ১০ টাকা**\n\n"
+            f"👥 **Invite লিংক 👇**\n"
             f"https://t.me/{bot.get_me().username}?start={user_id}"
         )
-        bot.reply_to(message, invite_msg)
-    elif text == "Withdraw":
+        bot.reply_to(message, invite_msg, parse_mode="Markdown")
+    elif text == "💳 Withdraw":
         balance = user.get("balance", 0)
         hold = user.get("hold_balance", 0)
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("💳 Withdraw", callback_data="user_withdraw"))
         bot.reply_to(message, f"💰 **Available Balance: {balance} ৳**\n💼 **Hold Balance: {hold} ৳**", parse_mode="Markdown", reply_markup=markup)
-    elif text == "My Profile":
+    elif text == "🧑‍💻 My Profile":
         balance = user.get("balance", 0)
         hold = user.get("hold_balance", 0)
         markup = InlineKeyboardMarkup()
@@ -785,8 +786,8 @@ def handle_messages(message):
             f"❌ **রিজেক্ট : {rej} টা কাজ**"
         )
         bot.reply_to(message, status_text, parse_mode="Markdown")
-    elif text == "FAQ":
-        bot.reply_to(message, "❓ Frequently Asked Questions:\n1. How to earn? Complete tasks.\n2. How to invite? Use your invite link.")
+    elif text == "❓ FAQ":
+        bot.reply_to(message, "**❓ Frequently Asked Questions:**\n**1. How to earn? Complete tasks.**\n**2. How to invite? Use your invite link.**", parse_mode="Markdown")
 
     else:
         bot.reply_to(message, "I didn't understand that. Please use the menu.", reply_markup=get_main_keyboard())
