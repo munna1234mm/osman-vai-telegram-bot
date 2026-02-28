@@ -296,10 +296,15 @@ def send_welcome(message):
         except ValueError:
             pass
 
+    welcome_text = (
+        "<b>Welcome to Earnx Box 🎁</b>\n\n"
+        "<b>🎁 আমাদের বটে আপনাকে স্বাগতম ফ্রিতে ইনকাম করতে চাইলে আমাদের সাথে থাকুন 🤝</b>"
+    )
     bot.reply_to(
         message, 
-        "Welcome to the Task Bot! Please choose an option below:", 
-        reply_markup=get_main_keyboard()
+        welcome_text, 
+        reply_markup=get_main_keyboard(),
+        parse_mode="HTML"
     )
 
 @bot.message_handler(commands=['admin'])
@@ -318,7 +323,11 @@ def handle_callbacks(call):
     if call.data == "check_join":
         if check_join(user_id):
             bot.answer_callback_query(call.id, "Verification successful!", show_alert=True)
-            bot.send_message(user_id, "Welcome to the Task Bot! Please choose an option below:", reply_markup=get_main_keyboard())
+            welcome_text = (
+                "<b>Welcome to Earnx Box 🎁</b>\n\n"
+                "<b>🎁 আমাদের বটে আপনাকে স্বাগতম ফ্রিতে ইনকাম করতে চাইলে আমাদের সাথে থাকুন 🤝</b>"
+            )
+            bot.send_message(user_id, welcome_text, reply_markup=get_main_keyboard(), parse_mode="HTML")
         else:
             bot.answer_callback_query(call.id, "You have not joined the channel yet.", show_alert=True)
         return
