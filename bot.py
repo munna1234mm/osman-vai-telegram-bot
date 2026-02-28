@@ -44,6 +44,9 @@ def get_user(user_id, username=None):
             "hold_balance": 0, 
             "completed_tasks": 0,
             "rejected_tasks": 0,
+            "active_referrals": 0,
+            "inactive_referrals": 0,
+            "referred_by": None,
             "banned": False, 
             "username": username.lower() if username else None
         }
@@ -60,6 +63,15 @@ def get_user(user_id, username=None):
         needs_save = True
     if "rejected_tasks" not in user:
         user["rejected_tasks"] = 0
+        needs_save = True
+    if "active_referrals" not in user:
+        user["active_referrals"] = 0
+        needs_save = True
+    if "inactive_referrals" not in user:
+        user["inactive_referrals"] = 0
+        needs_save = True
+    if "referred_by" not in user:
+        user["referred_by"] = None
         needs_save = True
     
     if needs_save:
@@ -277,10 +289,10 @@ def send_welcome(message):
             if referrer_id != user_id:
                 referrer = get_user(referrer_id)
                 if referrer:
-                    bonus = get_ref_bonus()
-                    new_balance = referrer.get("balance", 0) + bonus
-                    update_user_balance(referrer_id, new_balance)
-                    bot.send_message(referrer_id, f"🎉 Someone joined using your invite link! You received {bonus} ৳.")
+                    user["referred_by"] = referrer_id
+                    referrer["inactive_referrals"] = referrer.get("inactive_referrals", 0) + 1
+                    save_db()
+                    bot.send_message(referrer_id, f"🎉 Someone joined using your invite link! They are currently an **Inactive** referral. Once they complete their first task, you will receive 10 ৳ balance.", parse_mode="Markdown")
         except ValueError:
             pass
 
@@ -582,13 +594,28 @@ def process_task_reward(message, target_id, task_id):
         user = get_user(target_id)
         new_balance = user.get("balance", 0) + amount
         update_user_balance(target_id, new_balance)
-        bot.reply_to(message, f"✅ User {target_id} has been rewarded {amount} ৳.")
-        try:
-            bot.send_message(target_id, f"🎉 **Task Approved!**\nYou have been rewarded **{amount} ৳**.", parse_mode="Markdown")
-        except:
-            pass
-            
-        # Update Task Completion Count
+        # Referral Bonus Logic (Only on first task)
+        if user.get("completed_tasks", 0) == 0:
+            referrer_id = user.get("referred_by")
+            if referrer_id:
+                referrer = get_user(referrer_id)
+                if referrer:
+                    # Award 10 TK bonus to referrer
+                    new_ref_balance = referrer.get("balance", 0) + 10
+                    update_user_balance(referrer_id, new_ref_balance)
+                    
+                    # Update counts
+                    referrer["active_referrals"] = referrer.get("active_referrals", 0) + 1
+                    referrer["inactive_referrals"] = max(0, referrer.get("inactive_referrals", 0) - 1)
+                    save_db()
+                    
+                    try:
+                        bot.send_message(referrer_id, "🎊 Your referral just completed their first task! You received **10 ৳** referral bonus.", parse_mode="Markdown")
+                    except:
+                        pass
+
+        user["completed_tasks"] = user.get("completed_tasks", 0) + 1
+        save_db()
         for i, task in enumerate(db["tasks"]):
             if task["_id"] == task_id:
                 task["completed_count"] += 1
@@ -720,7 +747,16 @@ def handle_messages(message):
     elif text == "Daily Task":
         bot.reply_to(message, "📅 You selected: Daily Task\nComplete your daily task to earn rewards!")
     elif text == "Invite":
-        bot.reply_to(message, f"🔗 Here is your personal invite link: https://t.me/{bot.get_me().username}?start={user_id}\n\nInvite friends to earn {get_ref_bonus()} ৳ per referral!")
+        active = user.get("active_referrals", 0)
+        inactive = user.get("inactive_referrals", 0)
+        invite_msg = (
+            f"✅ Active {active}.0 রেফার\n"
+            f"❌ Inactive {inactive}.0 রেফার\n"
+            f"👥 প্রতি রেফার ১০ টাকা\n\n"
+            f"👥 Invite লিংক 👇\n"
+            f"https://t.me/{bot.get_me().username}?start={user_id}"
+        )
+        bot.reply_to(message, invite_msg)
     elif text == "Balance":
         balance = user.get("balance", 0)
         hold = user.get("hold_balance", 0)
