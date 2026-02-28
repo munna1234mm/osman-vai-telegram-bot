@@ -787,7 +787,12 @@ def handle_messages(message):
         )
         bot.reply_to(message, status_text, parse_mode="Markdown")
     elif text == "❓ FAQ":
-        bot.reply_to(message, "**❓ Frequently Asked Questions:**\n**1. How to earn? Complete tasks.**\n**2. How to invite? Use your invite link.**", parse_mode="Markdown")
+        faq_text = (
+            "**যে কোনো সমস্যা টেলিগ্ৰাম চ্যানেল জয়েন করুন এবং সকল আপডেট ও পেমেন্ট প্রুফ দেখুন 🧑💻**\n\n"
+            "**🔴 টেলিগ্ৰাম চ্যানেল 👇**\n"
+            "**👉 ( t.me/Earnx_Box )**"
+        )
+        bot.reply_to(message, faq_text, parse_mode="Markdown")
 
     else:
         bot.reply_to(message, "I didn't understand that. Please use the menu.", reply_markup=get_main_keyboard())
