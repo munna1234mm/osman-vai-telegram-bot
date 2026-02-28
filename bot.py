@@ -762,18 +762,20 @@ def handle_messages(message):
         hold = user.get("hold_balance", 0)
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("💳 Withdraw", callback_data="user_withdraw"))
-        bot.reply_to(message, f"💰 **Available Balance:** {balance} ৳\n💼 **Hold Balance:** {hold} ৳", parse_mode="Markdown", reply_markup=markup)
+        bot.reply_to(message, f"💰 **Available Balance: {balance} ৳**\n💼 **Hold Balance: {hold} ৳**", parse_mode="Markdown", reply_markup=markup)
     elif text == "My Profile":
         balance = user.get("balance", 0)
         hold = user.get("hold_balance", 0)
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("💳 Withdraw", callback_data="user_withdraw"))
         profile_text = (
-            f"🧑‍💻 **My Profile ID:** `{user_id}`\n\n"
-            f"💰 **Available Balance:** {balance} ৳\n"
-            f"💼 **Hold Balance:** {hold} ৳\n\n"
+            f"🧑‍💻 **My Profile ID: `{user_id}`**\n\n"
+            f"💰 **Available Balance: {balance} ৳**\n"
+            f"💼 **Hold Balance: {hold} ৳**\n\n"
             f"💸 **মিনিমাম উইথড্র মাএ ২০ টাকা** 💸\n"
             f"🧑‍💻 **পেমেন্ট বিকাশ/নগদ** 🏧"
         )
-        bot.reply_to(message, profile_text, parse_mode="Markdown")
+        bot.reply_to(message, profile_text, parse_mode="Markdown", reply_markup=markup)
     elif text == "📊 Status":
         comp = user.get("completed_tasks", 0)
         rej = user.get("rejected_tasks", 0)
