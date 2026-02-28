@@ -207,7 +207,7 @@ def get_main_keyboard():
         KeyboardButton("One Task"),
         KeyboardButton("Daily Task"),
         KeyboardButton("Invite"),
-        KeyboardButton("Balance"),
+        KeyboardButton("Withdraw"),
         KeyboardButton("My Profile"),
         KeyboardButton("📊 Status"),
         KeyboardButton("FAQ")
@@ -757,7 +757,7 @@ def handle_messages(message):
             f"https://t.me/{bot.get_me().username}?start={user_id}"
         )
         bot.reply_to(message, invite_msg)
-    elif text == "Balance":
+    elif text == "Withdraw":
         balance = user.get("balance", 0)
         hold = user.get("hold_balance", 0)
         markup = InlineKeyboardMarkup()
