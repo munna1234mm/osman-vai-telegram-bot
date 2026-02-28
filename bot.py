@@ -158,7 +158,7 @@ def remove_payment_method(name):
         db["settings"]["payment_methods"] = methods
         save_db()
 
-def add_task(title, url, limit, tutorial_url=None):
+def add_task(title, url, limit, reward, task_type, tutorial_url=None, image_file_id=None):
     import uuid
     task_id = str(uuid.uuid4())
     task_doc = {
@@ -166,8 +166,11 @@ def add_task(title, url, limit, tutorial_url=None):
         "title": title, 
         "url": url, 
         "limit": limit, 
+        "reward": reward,
+        "type": task_type, # 'one_task' or 'daily_task'
         "completed_count": 0,
-        "tutorial_url": tutorial_url
+        "tutorial_url": tutorial_url,
+        "image_file_id": image_file_id
     }
     db["tasks"].append(task_doc)
     save_db()
@@ -426,6 +429,11 @@ def handle_callbacks(call):
         bot.register_next_step_handler(msg, process_broadcast)
     elif call.data == "admin_view_users":
         send_all_users_report(user_id)
+    elif call.data.startswith("type_"):
+        task_type = call.data.replace("type_", "")
+        temp = db.get("temp_task", {})
+        msg = bot.send_message(user_id, "Tutorial Link (Optional):\n\nSend the URL (e.g. YouTube video) or type 'skip':")
+        bot.register_next_step_handler(msg, process_task_tutorial_step, temp['title'], temp['url'], temp['reward'], temp['limit'], task_type)
     elif call.data.startswith("submit_task_"):
         task_id = call.data.split("submit_task_")[1]
         msg = bot.send_message(user_id, "Please upload a screenshot or type your proof of completion for this task:")
@@ -435,8 +443,19 @@ def handle_callbacks(call):
         parts = call.data.split("_")
         target_id = int(parts[1])
         task_id = parts[2]
-        msg = bot.send_message(user_id, f"How much ৳ to reward User {target_id} for this task?")
-        bot.register_next_step_handler(msg, process_task_reward, target_id, task_id)
+        # Find the task to get its reward
+        task_reward = 0
+        for t in db["tasks"]:
+            if t["_id"] == task_id:
+                task_reward = t.get("reward", 0)
+                break
+        
+        if task_reward > 0:
+            # Auto-reward based on task definition
+            process_task_reward_auto(call.message, target_id, task_id, task_reward)
+        else:
+            msg = bot.send_message(user_id, f"How much ৳ to reward User {target_id} for this task?")
+            bot.register_next_step_handler(msg, process_task_reward, target_id, task_id)
         bot.edit_message_reply_markup(user_id, call.message.message_id, reply_markup=None)
     elif call.data.startswith("rej_"):
         parts = call.data.split("_")
@@ -509,7 +528,7 @@ def process_add_channel(message):
 
 def process_task_title(message):
     title = message.text.strip()
-    msg = bot.reply_to(message, f"Task Title set to: {title}\nNow, send the **URL Link** for this task:", parse_mode="Markdown")
+    msg = bot.reply_to(message, f"Task Title set to: <b>{title}</b>\nNow, send the <b>URL Link</b> for this task:", parse_mode="HTML")
     bot.register_next_step_handler(msg, process_task_url, title)
 
 def process_task_url(message, title):
@@ -517,27 +536,55 @@ def process_task_url(message, title):
     if not url.startswith("http"):
         return bot.reply_to(message, "Invalid URL. Please start again from /admin and provide a valid link (e.g., https://youtube.com).")
     
-    msg = bot.reply_to(message, "How many users can complete this task? (Enter a number for the limit):")
-    bot.register_next_step_handler(msg, process_task_limit, title, url)
+    msg = bot.reply_to(message, "How much <b>Reward (৳)</b> will the user get for this task?", parse_mode="HTML")
+    bot.register_next_step_handler(msg, process_task_reward_amount, title, url)
 
-def process_task_limit(message, title, url):
+def process_task_reward_amount(message, title, url):
+    try:
+        reward = int(message.text.strip())
+        msg = bot.reply_to(message, "How many users can complete this task? (Enter a number for the limit):")
+        bot.register_next_step_handler(msg, process_task_limit, title, url, reward)
+    except ValueError:
+        bot.reply_to(message, "Invalid amount. Please try adding the task again.")
+
+def process_task_limit(message, title, url, reward):
     try:
         limit = int(message.text.strip())
-        msg = bot.reply_to(message, "Tutorial Link (Optional):\n\nSend the URL (e.g. YouTube video) or type 'skip':")
-        bot.register_next_step_handler(msg, process_task_tutorial, title, url, limit)
+        markup = InlineKeyboardMarkup()
+        markup.add(
+            InlineKeyboardButton("📝 One Task", callback_data="type_one_task"),
+            InlineKeyboardButton("🎁 Daily Task", callback_data="type_daily_task")
+        )
+        msg = bot.send_message(message.chat.id, "Select <b>Task Type:</b>", parse_mode="HTML", reply_markup=markup)
+        # Store temporary data in a global or state-based way if needed, but for simplicity here:
+        # We'll use a hack by registering the next step but passing arguments
+        # Wait, for callbacks we need to handle it in handle_callbacks. Let's adjust.
+        # Temporary storage for task being created
+        db["temp_task"] = {"title": title, "url": url, "reward": reward, "limit": limit}
     except ValueError:
-        bot.reply_to(message, "Invalid number. Please try adding the task again from /admin.")
+        bot.reply_to(message, "Invalid number. Please try adding the task again.")
 
-def process_task_tutorial(message, title, url, limit):
+def process_task_tutorial_step(message, title, url, reward, limit, task_type):
     tutorial_url = message.text.strip()
     if tutorial_url.lower() == 'skip':
         tutorial_url = None
     elif not tutorial_url.startswith("http"):
         return bot.reply_to(message, "Invalid URL. Please send a valid link starting with http:// or https://, or type 'skip'.")
     
-    add_task(title, url, limit, tutorial_url)
+    msg = bot.reply_to(message, "Send an <b>Image/Photo</b> for this task, or type <b>'skip'</b>:", parse_mode="HTML")
+    bot.register_next_step_handler(msg, process_task_image, title, url, reward, limit, task_type, tutorial_url)
+
+def process_task_image(message, title, url, reward, limit, task_type, tutorial_url):
+    image_file_id = None
+    if message.photo:
+        image_file_id = message.photo[-1].file_id
+    elif message.text and message.text.lower() != 'skip':
+        # If user sent text instead of photo and it's not skip
+        pass 
+    
+    add_task(title, url, limit, reward, task_type, tutorial_url, image_file_id)
     tut_text = f"\nTutorial: {tutorial_url}" if tutorial_url else ""
-    bot.reply_to(message, f"✅ Task added successfully!\nTitle: {title}\nURL: {url}\nLimit: {limit} users{tut_text}")
+    bot.reply_to(message, f"✅ <b>Task added successfully!</b>\nTitle: {title}\nType: {task_type}\nReward: {reward}৳\nLimit: {limit} users{tut_text}", parse_mode="HTML")
 
 def process_broadcast(message):
     admin_id = message.from_user.id
@@ -597,44 +644,47 @@ def process_task_submission(message, task_id):
     except Exception as e:
         print(f"Failed to send task to admin: {e}")
 
+def process_task_reward_auto(message, target_id, task_id, amount):
+    user = get_user(target_id)
+    new_balance = user.get("balance", 0) + amount
+    update_user_balance(target_id, new_balance)
+    
+    # Referral Bonus Logic (Only on first task)
+    if user.get("completed_tasks", 0) == 0:
+        referrer_id = user.get("referred_by")
+        if referrer_id:
+            referrer = get_user(referrer_id)
+            if referrer:
+                new_ref_balance = referrer.get("balance", 0) + 10
+                update_user_balance(referrer_id, new_ref_balance)
+                referrer["active_referrals"] = referrer.get("active_referrals", 0) + 1
+                referrer["inactive_referrals"] = max(0, referrer.get("inactive_referrals", 0) - 1)
+                save_db()
+                try:
+                    bot.send_message(referrer_id, "🎊 Your referral just completed their first task! You received **10 ৳** referral bonus.", parse_mode="Markdown")
+                except: pass
+
+    user["completed_tasks"] = user.get("completed_tasks", 0) + 1
+    save_db()
+    
+    for i, task in enumerate(db["tasks"]):
+        if task["_id"] == task_id:
+            task["completed_count"] += 1
+            if task["completed_count"] >= task.get("limit", 0):
+                del db["tasks"][i]
+            save_db()
+            break
+            
+    try:
+        bot.send_message(target_id, f"✅ <b>Task Approved!</b>\n\nReward: <b>{amount}৳</b> has been added to your balance.", parse_mode="HTML")
+    except: pass
+
 def process_task_reward(message, target_id, task_id):
     try:
         amount = int(message.text)
-        user = get_user(target_id)
-        new_balance = user.get("balance", 0) + amount
-        update_user_balance(target_id, new_balance)
-        # Referral Bonus Logic (Only on first task)
-        if user.get("completed_tasks", 0) == 0:
-            referrer_id = user.get("referred_by")
-            if referrer_id:
-                referrer = get_user(referrer_id)
-                if referrer:
-                    # Award 10 TK bonus to referrer
-                    new_ref_balance = referrer.get("balance", 0) + 10
-                    update_user_balance(referrer_id, new_ref_balance)
-                    
-                    # Update counts
-                    referrer["active_referrals"] = referrer.get("active_referrals", 0) + 1
-                    referrer["inactive_referrals"] = max(0, referrer.get("inactive_referrals", 0) - 1)
-                    save_db()
-                    
-                    try:
-                        bot.send_message(referrer_id, "🎊 Your referral just completed their first task! You received **10 ৳** referral bonus.", parse_mode="Markdown")
-                    except:
-                        pass
-
-        user["completed_tasks"] = user.get("completed_tasks", 0) + 1
-        save_db()
-        for i, task in enumerate(db["tasks"]):
-            if task["_id"] == task_id:
-                task["completed_count"] += 1
-                if task["completed_count"] >= task.get("limit", 0):
-                    del db["tasks"][i]
-                save_db()
-                break
-                
+        process_task_reward_auto(message, target_id, task_id, amount)
     except ValueError:
-        bot.reply_to(message, "Invalid amount. Must be a number. Start over from the admin panel if needed.")
+        bot.reply_to(message, "Invalid amount. Must be a number.")
 
 def send_all_users_report(admin_id):
     try:
@@ -738,7 +788,7 @@ def handle_messages(message):
 
     text = message.text
     if text == "📝 One Task":
-        tasks = get_all_tasks()
+        tasks = [t for t in get_all_tasks() if t.get('type') == 'one_task']
         if not tasks:
             bot.reply_to(message, "<b>📝 বর্তমান কোনো কাজ নেই</b>", parse_mode="HTML")
         else:
@@ -747,14 +797,57 @@ def handle_messages(message):
                 task_id = str(task.get('_id', ''))
                 title = task.get('title', 'Task')
                 url = task.get('url', '')
+                reward = task.get('reward', 0)
                 tut_url = task.get('tutorial_url')
                 limit = task.get('limit', 0)
                 completed = task.get('completed_count', 0)
+                image_id = task.get('image_file_id')
                 
-                msg_text = f"📌 <b>{title}</b>\n👥 Slots: {completed}/{limit} completed"
-                bot.send_message(message.chat.id, msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML")
+                msg_text = (
+                    f"🔴 <b>Title: {title}</b>\n"
+                    f"👥 <b>Works : {completed}/{limit} Complete ✅</b>\n"
+                    f"💸 <b>প্রতি কাজ {reward} টাকা</b>\n\n"
+                    f"👉 <b>কাজের লিংক (<a href='{url}'>Link</a>) 👈</b>\n"
+                )
+                if tut_url:
+                    msg_text += f"👉 <b>কাজের ভিডিও (<a href='{tut_url}'>Video</a>) 👈</b>\n"
+                msg_text += f"👉 <b>প্রুফ জমা করুন 👈</b>"
+                
+                if image_id:
+                    bot.send_photo(message.chat.id, image_id, caption=msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML")
+                else:
+                    bot.send_message(message.chat.id, msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML", disable_web_page_preview=True)
+                    
     elif text == "🎁 Daily Task":
-        bot.reply_to(message, "<b>📝 বর্তমান কোনো কাজ নেই</b>", parse_mode="HTML")
+        tasks = [t for t in get_all_tasks() if t.get('type') == 'daily_task']
+        if not tasks:
+            bot.reply_to(message, "<b>📝 বর্তমান কোনো কাজ নেই</b>", parse_mode="HTML")
+        else:
+            bot.reply_to(message, "<b>🎁 Daily Tasks:</b>", parse_mode="HTML")
+            for task in tasks:
+                task_id = str(task.get('_id', ''))
+                title = task.get('title', 'Task')
+                url = task.get('url', '')
+                reward = task.get('reward', 0)
+                tut_url = task.get('tutorial_url')
+                limit = task.get('limit', 0)
+                completed = task.get('completed_count', 0)
+                image_id = task.get('image_file_id')
+                
+                msg_text = (
+                    f"🔴 <b>Title: {title}</b>\n"
+                    f"👥 <b>Works : {completed}/{limit} Complete ✅</b>\n"
+                    f"💸 <b>প্রতি কাজ {reward} টাকা</b>\n\n"
+                    f"👉 <b>কাজের লিংক (<a href='{url}'>Link</a>) 👈</b>\n"
+                )
+                if tut_url:
+                    msg_text += f"👉 <b>কাজের ভিডিও (<a href='{tut_url}'>Video</a>) 👈</b>\n"
+                msg_text += f"👉 <b>প্রুফ জমা করুন 👈</b>"
+                
+                if image_id:
+                    bot.send_photo(message.chat.id, image_id, caption=msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML")
+                else:
+                    bot.send_message(message.chat.id, msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML", disable_web_page_preview=True)
     elif text == "👥 Invite":
         active = user.get("active_referrals", 0)
         inactive = user.get("inactive_referrals", 0)
