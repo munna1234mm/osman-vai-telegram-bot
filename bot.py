@@ -757,9 +757,13 @@ async def process_webhook(request: Request):
     bot.process_new_updates([update])
     return {"status": "ok"}
 
+@app.get("/ping")
+def ping():
+    return {"status": "alive", "message": "Bot is awake!"}
+
 @app.get("/")
 def home():
-    return {"status": "Bot is running on Render!"}
+    return {"status": "Bot is running on Render!", "ping_endpoint": "/ping"}
 
 if __name__ == '__main__':
     print("Bot configuration loaded.")
