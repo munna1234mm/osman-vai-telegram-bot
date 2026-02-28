@@ -758,11 +758,15 @@ def handle_messages(message):
         )
         bot.reply_to(message, invite_msg, parse_mode="HTML")
     elif text == "💳 Withdraw":
-        balance = user.get("balance", 0)
-        hold = user.get("hold_balance", 0)
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("💳 Withdraw", callback_data="user_withdraw"))
-        bot.reply_to(message, f"💰 <b>Available Balance: {balance} ৳</b>\n💼 <b>Hold Balance: {hold} ৳</b>", parse_mode="HTML", reply_markup=markup)
+        withdraw_text = (
+            "<b>🧑💻 মিনিমাম উইথড্র ২০ টাকা 💸</b>\n\n"
+            "<b>🧑💻 পেমেন্ট মেথড</b>\n"
+            "<b>🏧 বিকাশ / নগদ</b>\n"
+            "<b>💵 উইথড্র চার্জ ১০%</b>"
+        )
+        bot.reply_to(message, withdraw_text, parse_mode="HTML", reply_markup=markup)
     elif text == "🧑‍💻 My Profile":
         balance = user.get("balance", 0)
         hold = user.get("hold_balance", 0)
