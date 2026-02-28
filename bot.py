@@ -729,11 +729,11 @@ def handle_messages(message):
 
     text = message.text
     if text == "One Task":
-        bot.reply_to(message, "📝 Available Tasks:")
         tasks = get_all_tasks()
         if not tasks:
-            bot.send_message(message.chat.id, "There are no tasks available right now.")
+            bot.reply_to(message, "**📝 বর্তমান কোনো কাজ নেই**", parse_mode="Markdown")
         else:
+            bot.reply_to(message, "**📝 Available Tasks:**", parse_mode="Markdown")
             for task in tasks:
                 task_id = str(task.get('_id', ''))
                 title = task.get('title', 'Task')
@@ -745,7 +745,7 @@ def handle_messages(message):
                 text = f"📌 **{title}**\n👥 Slots: {completed}/{limit} completed"
                 bot.send_message(message.chat.id, text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="Markdown")
     elif text == "Daily Task":
-        bot.reply_to(message, "📅 You selected: Daily Task\nComplete your daily task to earn rewards!")
+        bot.reply_to(message, "**📝 বর্তমান কোনো কাজ নেই**", parse_mode="Markdown")
     elif text == "Invite":
         active = user.get("active_referrals", 0)
         inactive = user.get("inactive_referrals", 0)
@@ -777,7 +777,12 @@ def handle_messages(message):
     elif text == "📊 Status":
         comp = user.get("completed_tasks", 0)
         rej = user.get("rejected_tasks", 0)
-        bot.reply_to(message, f"📊 **Your Task Activity:**\n\n✅ Completed: {comp}\n❌ Rejected: {rej}", parse_mode="Markdown")
+        status_text = (
+            f"📊 **আপনার কাজের হিস্টোরি 👇**\n\n"
+            f"✅ **কমপিল্ট : {comp} টা কাজ**\n"
+            f"❌ **রিজেক্ট : {rej} টা কাজ**"
+        )
+        bot.reply_to(message, status_text, parse_mode="Markdown")
     elif text == "FAQ":
         bot.reply_to(message, "❓ Frequently Asked Questions:\n1. How to earn? Complete tasks.\n2. How to invite? Use your invite link.")
 
