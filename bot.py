@@ -728,13 +728,12 @@ def handle_messages(message):
         )
 
     text = message.text
-    text = message.text
     if text == "📝 One Task":
         tasks = get_all_tasks()
         if not tasks:
-            bot.reply_to(message, "**📝 বর্তমান কোনো কাজ নেই**", parse_mode="Markdown")
+            bot.reply_to(message, "<b>📝 বর্তমান কোনো কাজ নেই</b>", parse_mode="HTML")
         else:
-            bot.reply_to(message, "**📝 Available Tasks:**", parse_mode="Markdown")
+            bot.reply_to(message, "<b>📝 Available Tasks:</b>", parse_mode="HTML")
             for task in tasks:
                 task_id = str(task.get('_id', ''))
                 title = task.get('title', 'Task')
@@ -743,56 +742,56 @@ def handle_messages(message):
                 limit = task.get('limit', 0)
                 completed = task.get('completed_count', 0)
                 
-                msg_text = f"📌 **{title}**\n👥 Slots: {completed}/{limit} completed"
-                bot.send_message(message.chat.id, msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="Markdown")
+                msg_text = f"📌 <b>{title}</b>\n👥 Slots: {completed}/{limit} completed"
+                bot.send_message(message.chat.id, msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML")
     elif text == "🎁 Daily Task":
-        bot.reply_to(message, "**📝 বর্তমান কোনো কাজ নেই**", parse_mode="Markdown")
+        bot.reply_to(message, "<b>📝 বর্তমান কোনো কাজ নেই</b>", parse_mode="HTML")
     elif text == "👥 Invite":
         active = user.get("active_referrals", 0)
         inactive = user.get("inactive_referrals", 0)
         invite_msg = (
-            f"✅ **Active {active}.0 রেফার**\n"
-            f"❌ **Inactive {inactive}.0 রেফার**\n"
-            f"👥 **প্রতি রেফার ১০ টাকা**\n\n"
-            f"👥 **Invite লিংক 👇**\n"
+            f"✅ <b>Active {active}.0 রেফার</b>\n"
+            f"❌ <b>Inactive {inactive}.0 রেফার</b>\n"
+            f"👥 <b>প্রতি রেফার ১০ টাকা</b>\n\n"
+            f"👥 <b>Invite লিংক 👇</b>\n"
             f"https://t.me/{bot.get_me().username}?start={user_id}"
         )
-        bot.reply_to(message, invite_msg, parse_mode="Markdown")
+        bot.reply_to(message, invite_msg, parse_mode="HTML")
     elif text == "💳 Withdraw":
         balance = user.get("balance", 0)
         hold = user.get("hold_balance", 0)
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("💳 Withdraw", callback_data="user_withdraw"))
-        bot.reply_to(message, f"💰 **Available Balance: {balance} ৳**\n💼 **Hold Balance: {hold} ৳**", parse_mode="Markdown", reply_markup=markup)
+        bot.reply_to(message, f"💰 <b>Available Balance: {balance} ৳</b>\n💼 <b>Hold Balance: {hold} ৳</b>", parse_mode="HTML", reply_markup=markup)
     elif text == "🧑‍💻 My Profile":
         balance = user.get("balance", 0)
         hold = user.get("hold_balance", 0)
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("💳 Withdraw", callback_data="user_withdraw"))
         profile_text = (
-            f"🧑‍💻 **My Profile ID: `{user_id}`**\n\n"
-            f"💰 **Available Balance: {balance} ৳**\n"
-            f"💼 **Hold Balance: {hold} ৳**\n\n"
-            f"💸 **মিনিমাম উইথড্র মাএ ২০ টাকা** 💸\n"
-            f"🧑‍💻 **পেমেন্ট বিকাশ/নগদ** 🏧"
+            f"🧑‍💻 <b>My Profile ID: <code>{user_id}</code></b>\n\n"
+            f"💰 <b>Available Balance: {balance} ৳</b>\n"
+            f"💼 <b>Hold Balance: {hold} ৳</b>\n\n"
+            f"💸 <b>মিনিমাম উইথড্র মাএ ২০ টাকা</b> 💸\n"
+            f"🧑‍💻 <b>পেমেন্ট বিকাশ/নগদ</b> 🏧"
         )
-        bot.reply_to(message, profile_text, parse_mode="Markdown", reply_markup=markup)
+        bot.reply_to(message, profile_text, parse_mode="HTML", reply_markup=markup)
     elif text == "📊 Status":
         comp = user.get("completed_tasks", 0)
         rej = user.get("rejected_tasks", 0)
         status_text = (
-            f"📊 **আপনার কাজের হিস্টোরি 👇**\n\n"
-            f"✅ **কমপিল্ট : {comp} টা কাজ**\n"
-            f"❌ **রিজেক্ট : {rej} টা কাজ**"
+            f"📊 <b>আপনার কাজের হিস্টোরি 👇</b>\n\n"
+            f"✅ <b>কমপিল্ট : {comp} টা কাজ</b>\n"
+            f"❌ <b>রিজেক্ট : {rej} টা কাজ</b>"
         )
-        bot.reply_to(message, status_text, parse_mode="Markdown")
+        bot.reply_to(message, status_text, parse_mode="HTML")
     elif text == "❓ FAQ":
         faq_text = (
-            "**যে কোনো সমস্যা টেলিগ্ৰাম চ্যানেল জয়েন করুন এবং সকল আপডেট ও পেমেন্ট প্রুফ দেখুন 🧑💻**\n\n"
-            "**🔴 টেলিগ্ৰাম চ্যানেল 👇**\n"
-            "**👉 ( t.me/Earnx_Box )**"
+            "<b>যে কোনো সমস্যা টেলিগ্ৰাম চ্যানেল জয়েন করুন এবং সকল আপডেট ও পেমেন্ট প্রুফ দেখুন 🧑💻</b>\n\n"
+            "<b>🔴 টেলিগ্ৰাম চ্যানেল 👇</b>\n"
+            "<b>👉 ( t.me/Earnx_Box )</b>"
         )
-        bot.reply_to(message, faq_text, parse_mode="Markdown")
+        bot.reply_to(message, faq_text, parse_mode="HTML")
 
     else:
         bot.reply_to(message, "I didn't understand that. Please use the menu.", reply_markup=get_main_keyboard())
@@ -801,10 +800,14 @@ def handle_messages(message):
 # --- FastAPI routes for Webhook ---
 @app.post(f"/{TOKEN}/")
 async def process_webhook(request: Request):
-    json_str = await request.body()
-    update = Update.de_json(json_str.decode('utf-8'))
-    bot.process_new_updates([update])
-    return {"status": "ok"}
+    try:
+        json_str = await request.body()
+        update = Update.de_json(json_str.decode('utf-8'))
+        bot.process_new_updates([update])
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"Error processing webhook: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.get("/ping")
 def ping():
