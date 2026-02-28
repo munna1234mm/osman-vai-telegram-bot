@@ -262,10 +262,10 @@ def get_tasks_keyboard():
 
 def get_single_task_keyboard(task_id, url, tutorial_url=None):
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("🔗 Go to Task", url=url))
+    markup.add(InlineKeyboardButton("👉 কাজের লিংক (Link) 👈", url=url))
     if tutorial_url:
-        markup.add(InlineKeyboardButton("📺 Tutorial", url=tutorial_url))
-    markup.add(InlineKeyboardButton("✅ Submit This Task", callback_data=f"submit_task_{task_id}"))
+        markup.add(InlineKeyboardButton("👉 কাজের ভিডিও (Video) 👈", url=tutorial_url))
+    markup.add(InlineKeyboardButton("👉 প্রুফ জমা করুন 👈", callback_data=f"submit_task_{task_id}"))
     return markup
 
 # --- Core Command Handlers ---
