@@ -10,7 +10,7 @@ TOKEN = os.getenv("BOT_TOKEN", "8243932163:AAFRMmbcIJqQgbQCrSpJIiHpKesHS5mH-LI")
 bot = telebot.TeleBot(TOKEN)
 app = FastAPI()
 
-ADMIN_IDS = []
+ADMIN_IDS = [6686196987]
 
 DB_FILE = "database.json"
 
