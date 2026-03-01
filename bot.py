@@ -436,7 +436,7 @@ def handle_callbacks(call):
         bot.register_next_step_handler(msg, process_task_tutorial_step, temp['title'], temp['url'], temp['reward'], temp['limit'], task_type)
     elif call.data.startswith("submit_task_"):
         task_id = call.data.split("submit_task_")[1]
-        msg = bot.send_message(user_id, "Please upload a screenshot or type your proof of completion for this task:")
+        msg = bot.send_message(user_id, "🖼️ <b>Task Submit করতে (১-২) টি স্ক্রিনশট জমা করুন 👇</b>", parse_mode="HTML")
         bot.register_next_step_handler(msg, process_task_submission, task_id)
     elif call.data.startswith("app_"):
         # Format: app_USERID_TASKID
