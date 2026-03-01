@@ -262,9 +262,9 @@ def get_tasks_keyboard():
 
 def get_single_task_keyboard(task_id, url, tutorial_url=None):
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("👉 কাজের লিংক (Link) 👈", url=url))
+    markup.add(InlineKeyboardButton("👉 কাজের লিংক 👈", url=url))
     if tutorial_url:
-        markup.add(InlineKeyboardButton("👉 কাজের ভিডিও (Video) 👈", url=tutorial_url))
+        markup.add(InlineKeyboardButton("👉 কাজের ভিডিও 👈", url=tutorial_url))
     markup.add(InlineKeyboardButton("👉 প্রুফ জমা করুন 👈", callback_data=f"submit_task_{task_id}"))
     return markup
 
