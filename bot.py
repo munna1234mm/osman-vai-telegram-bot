@@ -207,41 +207,41 @@ def check_join(user_id):
 def get_main_keyboard():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
-        KeyboardButton("📝 One Task"),
-        KeyboardButton("🎁 Daily Task"),
-        KeyboardButton("👥 Invite"),
-        KeyboardButton("💳 Withdraw"),
-        KeyboardButton("🧑‍💻 My Profile"),
-        KeyboardButton("📊 Status"),
-        KeyboardButton("❓ FAQ")
+        KeyboardButton("📝 কাজ করুন"),
+        KeyboardButton("🎁 ডেইলি টাস্ক"),
+        KeyboardButton("👥 রেফার করুন"),
+        KeyboardButton("💳 উইথড্র"),
+        KeyboardButton("🧑‍💻 আমার প্রোফাইল"),
+        KeyboardButton("📊 স্ট্যাটাস"),
+        KeyboardButton("❓ প্রশ্ন ও উত্তর")
     )
     return markup
 
 def get_admin_keyboard():
     markup = InlineKeyboardMarkup()
     markup.add(
-        InlineKeyboardButton("🚫 Ban User", callback_data="admin_ban"),
-        InlineKeyboardButton("🟢 Unban User", callback_data="admin_unban")
+        InlineKeyboardButton("🚫 ইউজার ব্যান করুন", callback_data="admin_ban"),
+        InlineKeyboardButton("🟢 ইউজার আনব্যান করুন", callback_data="admin_unban")
     )
     markup.add(
-        InlineKeyboardButton("💰 Edit Balance", callback_data="admin_balance"),
-        InlineKeyboardButton("💼 Edit Hold Balance", callback_data="admin_hold_balance")
+        InlineKeyboardButton("💰 ব্যালেন্স এডিট", callback_data="admin_balance"),
+        InlineKeyboardButton("💼 হোল্ড ব্যালেন্স এডিট", callback_data="admin_hold_balance")
     )
     markup.add(
-        InlineKeyboardButton("🎁 Set Ref Bonus", callback_data="admin_ref_bonus"),
-        InlineKeyboardButton("➕ Add Task", callback_data="admin_add_task")
+        InlineKeyboardButton("🎁 রেফার বোনাস সেট", callback_data="admin_ref_bonus"),
+        InlineKeyboardButton("➕ কাজ যোগ করুন", callback_data="admin_add_task")
     )
     markup.add(
-        InlineKeyboardButton("⚙️ Manage Methods", callback_data="admin_methods"),
-        InlineKeyboardButton("👥 View All Users", callback_data="admin_view_users")
+        InlineKeyboardButton("⚙️ মেথড ম্যানেজ", callback_data="admin_methods"),
+        InlineKeyboardButton("👥 সব ইউজার দেখুন", callback_data="admin_view_users")
     )
     markup.add(
-        InlineKeyboardButton("📢 Add/Change Channel", callback_data="admin_channel"),
-        InlineKeyboardButton("🗑️ Remove Channel", callback_data="admin_rm_channel")
+        InlineKeyboardButton("📢 চ্যানেল যোগ/পরিবর্তন", callback_data="admin_channel"),
+        InlineKeyboardButton("🗑️ চ্যানেল রিমুভ", callback_data="admin_rm_channel")
     )
     markup.add(
-        InlineKeyboardButton("🗑️ Remove Task", callback_data="admin_remove_task"),
-        InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")
+        InlineKeyboardButton("🗑️ কাজ রিমুভ", callback_data="admin_remove_task"),
+        InlineKeyboardButton("📢 ব্রডকাস্ট", callback_data="admin_broadcast")
     )
     return markup
 
@@ -282,7 +282,7 @@ def send_welcome(message):
 
     user = get_user(user_id, username)
     if user.get("banned"):
-        return bot.reply_to(message, "You are banned from using this bot.")
+        return bot.reply_to(message, "আপনি এই বটটি ব্যবহার করতে পারছেন না কারণ আপনাকে ব্যান করা হয়েছে।")
         
     # Handle Referral Logic
     if is_new and " " in message.text:
@@ -295,12 +295,12 @@ def send_welcome(message):
                     user["referred_by"] = referrer_id
                     referrer["inactive_referrals"] = referrer.get("inactive_referrals", 0) + 1
                     save_db()
-                    bot.send_message(referrer_id, f"🎉 Someone joined using your invite link! They are currently an **Inactive** referral. Once they complete their first task, you will receive 10 ৳ balance.", parse_mode="Markdown")
+                    bot.send_message(referrer_id, f"🎉 কেউ আপনার ইনভাইট লিংক ব্যবহার করে জয়েন করেছেন! তারা বর্তমানে **Inactive** মেম্বার হিসেবে আছেন। যখন তারা তাদের প্রথম কাজ শেষ করবেন, আপনি ১০ ৳ ব্যালেন্স পাবেন।", parse_mode="Markdown")
         except ValueError:
             pass
 
     welcome_text = (
-        "<b>Welcome to Earnx Box 🎁</b>\n\n"
+        "<b>Earnx Box-এ স্বাগতম 🎁</b>\n\n"
         "<b>🎁 আমাদের বটে আপনাকে স্বাগতম ফ্রিতে ইনকাম করতে চাইলে আমাদের সাথে থাকুন 🤝</b>"
     )
     bot.reply_to(
@@ -313,9 +313,9 @@ def send_welcome(message):
 @bot.message_handler(commands=['admin'])
 def handle_admin(message):
     if not is_admin(message.from_user.id):
-        return bot.reply_to(message, "You do not have permission to use this command.")
+        return bot.reply_to(message, "আপনার এই কমান্ডটি ব্যবহার করার অনুমতি নেই।")
 
-    msg_text = f"⚙️ Welcome to the Admin Panel!\n💾 DB Status: JSON Local (Active)\n\nChoose an action:"
+    msg_text = f"⚙️ অ্যাডমিন প্যানেলে স্বাগতম!\n💾 ডাটাবেস স্ট্যাটাস: JSON লোকাল (সক্রিয়)\n\nএকটি অ্যাকশন বেছে নিন:"
     bot.reply_to(message, msg_text, reply_markup=get_admin_keyboard())
 
 # --- Callback Handlers ---
@@ -325,30 +325,30 @@ def handle_callbacks(call):
     
     if call.data == "check_join":
         if check_join(user_id):
-            bot.answer_callback_query(call.id, "Verification successful!", show_alert=True)
+            bot.answer_callback_query(call.id, "ভেরিফিকেশন সফল হয়েছে!", show_alert=True)
             welcome_text = (
-                "<b>Welcome to Earnx Box 🎁</b>\n\n"
+                "<b>Earnx Box-এ স্বাগতম 🎁</b>\n\n"
                 "<b>🎁 আমাদের বটে আপনাকে স্বাগতম ফ্রিতে ইনকাম করতে চাইলে আমাদের সাথে থাকুন 🤝</b>"
             )
             bot.send_message(user_id, welcome_text, reply_markup=get_main_keyboard(), parse_mode="HTML")
         else:
-            bot.answer_callback_query(call.id, "You have not joined the channel yet.", show_alert=True)
+            bot.answer_callback_query(call.id, "আপনি এখনো চ্যানেলটি জয়েন করেননি।", show_alert=True)
         return
 
     if not is_admin(user_id):
-        return bot.answer_callback_query(call.id, "Access Denied.")
+        return bot.answer_callback_query(call.id, "এক্সেস ডিনাইড।")
 
     if call.data == "admin_ban":
-        msg = bot.send_message(user_id, "Send the User ID or @username to BAN:")
+        msg = bot.send_message(user_id, "ব্যান করতে ইউজার আইডি অথবা @ইউজারনেম পাঠান:")
         bot.register_next_step_handler(msg, process_ban)
     elif call.data == "admin_unban":
-        msg = bot.send_message(user_id, "Send the User ID or @username to UNBAN:")
+        msg = bot.send_message(user_id, "আনব্যান করতে ইউজার আইডি অথবা @ইউজারনেম পাঠান:")
         bot.register_next_step_handler(msg, process_unban)
     elif call.data == "admin_balance":
-        msg = bot.send_message(user_id, "Send the User ID or @username to edit balance:")
+        msg = bot.send_message(user_id, "ব্যালেন্স এডিট করতে ইউজার আইডি অথবা @ইউজারনেম পাঠান:")
         bot.register_next_step_handler(msg, process_balance_user_input)
     elif call.data == "admin_hold_balance":
-        msg = bot.send_message(user_id, "Send the User ID or @username to edit **Hold Balance**:", parse_mode="Markdown")
+        msg = bot.send_message(user_id, "**হোল্ড ব্যালেন্স** এডিট করতে ইউজার আইডি অথবা @ইউজারনেম পাঠান:", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_hold_balance_user_input)
     elif call.data == "admin_methods":
         show_manage_methods(user_id)
@@ -357,19 +357,19 @@ def handle_callbacks(call):
         remove_payment_method(method)
         show_manage_methods(user_id)
     elif call.data == "admin_add_method":
-        msg = bot.send_message(user_id, "Send the name of the new Payment Method (e.g., Rocket):")
+        msg = bot.send_message(user_id, "নতুন পেমেন্ট মেথড এর নাম পাঠান (যেমন: রকেট):")
         bot.register_next_step_handler(msg, process_add_method)
     elif call.data == "user_withdraw":
         methods = get_payment_methods()
         if not methods:
-            return bot.answer_callback_query(call.id, "No payment methods available. Contact Admin.")
+            return bot.answer_callback_query(call.id, "কোনো পেমেন্ট মেথড পাওয়া যায়নি। এডমিনের সাথে যোগাযোগ করুন।")
         markup = InlineKeyboardMarkup()
         for m in methods:
             markup.add(InlineKeyboardButton(m, callback_data=f"wd_method_{m}"))
-        bot.edit_message_text("💳 Select your preferred payment method:", user_id, call.message.message_id, reply_markup=markup)
+        bot.edit_message_text("💳 আপনার পছন্দের পেমেন্ট মেথড টি সিলেক্ট করুন:", user_id, call.message.message_id, reply_markup=markup)
     elif call.data.startswith("wd_method_"):
         method = call.data.replace("wd_method_", "")
-        msg = bot.edit_message_text(f"Selected: {method}\n\nSend your withdrawal Number (e.g., your Bkash Number):", user_id, call.message.message_id)
+        msg = bot.edit_message_text(f"সিলেক্ট করা হয়েছে: {method}\n\nআপনার উইথড্র নাম্বার পাঠান (যেমন: বিকাশ নাম্বার):", user_id, call.message.message_id)
         bot.register_next_step_handler(msg, process_withdraw_number, method)
     elif call.data.startswith("wd_app_"):
         # Format: wd_app_USERID_AMOUNT_METHOD_NUMBER
@@ -381,58 +381,58 @@ def handle_callbacks(call):
         
         user = get_user(target_id)
         if user.get("balance", 0) < amount:
-            return bot.answer_callback_query(call.id, "User does not have enough balance anymore!", show_alert=True)
+            return bot.answer_callback_query(call.id, "ইউজারের পর্যাপ্ত ব্যালেন্স নেই!", show_alert=True)
         
         new_balance = user["balance"] - amount
         update_user_balance(target_id, new_balance)
         
-        bot.edit_message_text(f"✅ Withdrawal Approved!\nUser: {target_id}\nAmount: {amount}৳\nMethod: {method}\nNumber: {number}", user_id, call.message.message_id, reply_markup=None)
+        bot.edit_message_text(f"✅ উইথড্রাল সফল হয়েছে!\nইউজার: {target_id}\nপরিমাণ: {amount}৳\nমেথড: {method}\nনাম্বার: {number}", user_id, call.message.message_id, reply_markup=None)
         try:
-            bot.send_message(target_id, f"✅ **Withdrawal Approved!**\n{amount} ৳ has been sent to your {method} account ({number}).", parse_mode="Markdown")
+            bot.send_message(target_id, f"✅ **উইথড্রাল সফল হয়েছে!**\n{amount} ৳ আপনার {method} একাউন্টে ({number}) পাঠিয়ে দেওয়া হয়েছে।", parse_mode="Markdown")
         except:
             pass
     elif call.data.startswith("wd_rej_"):
         parts = call.data.split("_")
         target_id = int(parts[2])
-        bot.edit_message_text("❌ Withdrawal Request Rejected.", user_id, call.message.message_id, reply_markup=None)
+        bot.edit_message_text("❌ উইথড্রাল রিকোয়েস্ট বাতিল করা হয়েছে।", user_id, call.message.message_id, reply_markup=None)
         try:
-            bot.send_message(target_id, "❌ Your recent withdrawal request was **Rejected** by the Admin.", parse_mode="Markdown")
+            bot.send_message(target_id, "❌ আপনার উইথড্রাল রিকোয়েস্টটি অ্যাডমিন বাতিল করেছেন।", parse_mode="Markdown")
         except:
             pass
     elif call.data == "admin_remove_task":
         tasks = get_all_tasks()
         if not tasks:
-            return bot.answer_callback_query(call.id, "No tasks to remove.")
+            return bot.answer_callback_query(call.id, "মুছার মতো কোনো কাজ নেই।")
         markup = InlineKeyboardMarkup()
         for t in tasks:
             markup.add(InlineKeyboardButton(f"🗑️ {t['title']}", callback_data=f"del_task_{t['_id']}"))
-        bot.send_message(user_id, "Select a task to **Permanently Delete**:", parse_mode="Markdown", reply_markup=markup)
+        bot.send_message(user_id, "স্থায়ীভাবে মুছতে একটি কাজ বেছে নিন:", parse_mode="Markdown", reply_markup=markup)
     elif call.data.startswith("del_task_"):
         task_id = call.data.replace("del_task_", "")
         delete_task(task_id)
-        bot.answer_callback_query(call.id, "Task Deleted!")
-        bot.edit_message_text("✅ Task has been removed.", user_id, call.message.message_id)
+        bot.answer_callback_query(call.id, "কাজটি মুছে ফেলা হয়েছে!")
+        bot.edit_message_text("✅ টাস্ক রিমুভ করা হয়েছে।", user_id, call.message.message_id)
     elif call.data == "admin_channel":
-        msg = bot.send_message(user_id, "Send the Channel Username (e.g., @mychannel):\n\n*Make sure this bot is added as an Admin in that channel first!*", parse_mode="Markdown")
+        msg = bot.send_message(user_id, "চ্যানেলের ইউজারনেম পাঠান (যেমন: @mychannel):\n\n*নিশ্চিত করুন যে এই বটটিকে চ্যানেলে অ্যাডমিন হিসেবে অ্যাড করা হয়েছে!*", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_add_channel)
     elif call.data == "admin_rm_channel":
         set_mandatory_channel(None)
-        bot.send_message(user_id, "Mandatory channel verification has been removed.")
+        bot.send_message(user_id, "চ্যানেল ভেরিফিকেশন রিমুভ করা হয়েছে।")
     elif call.data == "admin_add_task":
-        msg = bot.send_message(user_id, "Send the **Title** of the new Task (e.g., 'Subscribe to YouTube'):", parse_mode="Markdown")
+        msg = bot.send_message(user_id, "নতুন কাজের **টাইটেল** পাঠান (যেমন: 'ইউটিউব সাবস্ক্রাইব'):", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_task_title)
     elif call.data == "admin_ref_bonus":
-        msg = bot.send_message(user_id, f"Current Referral Bonus: {get_ref_bonus()} ৳\n\nSend the **new amount** (in ৳):", parse_mode="Markdown")
+        msg = bot.send_message(user_id, f"বর্তমান রেফার বোনাস: {get_ref_bonus()} ৳\n\n**নতুন পরিমাণ** পাঠান (৳-এ):", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_ref_bonus)
     elif call.data == "admin_broadcast":
-        msg = bot.send_message(user_id, "📣 **Broadcast Message**\n\nSend the message you want to broadcast to **ALL users**.\nYou can send text or a photo with a caption.", parse_mode="Markdown")
+        msg = bot.send_message(user_id, "📣 **ব্রডকাস্ট মেসেজ**\n\nআপনি সব ইউজারকে যে মেসেজটি পাঠাতে চান তা লিখুন।\nআপনি চাইলে ছবির সাথে ক্যাপশনও পাঠাতে পারেন।", parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_broadcast)
     elif call.data == "admin_view_users":
         send_all_users_report(user_id)
     elif call.data.startswith("type_"):
         task_type = call.data.replace("type_", "")
         temp = db.get("temp_task", {})
-        msg = bot.send_message(user_id, "Tutorial Link (Optional):\n\nSend the URL (e.g. YouTube video) or type 'skip':")
+        msg = bot.send_message(user_id, "টিউটোরিয়াল লিংক (ঐচ্ছিক):\n\nভিডিও লিংক পাঠান অথবা 'skip' লিখুন:")
         bot.register_next_step_handler(msg, process_task_tutorial_step, temp['title'], temp['url'], temp['reward'], temp['limit'], task_type)
     elif call.data.startswith("submit_task_"):
         task_id = call.data.split("submit_task_")[1]
@@ -454,7 +454,7 @@ def handle_callbacks(call):
             # Auto-reward based on task definition
             process_task_reward_auto(call.message, target_id, task_id, task_reward)
         else:
-            msg = bot.send_message(user_id, f"How much ৳ to reward User {target_id} for this task?")
+            msg = bot.send_message(user_id, f"ইউজার {target_id}-কে কত টাকা রিওয়ার্ড দিতে চান?")
             bot.register_next_step_handler(msg, process_task_reward, target_id, task_id)
         bot.edit_message_reply_markup(user_id, call.message.message_id, reply_markup=None)
     elif call.data.startswith("rej_"):
@@ -464,114 +464,114 @@ def handle_callbacks(call):
         user["rejected_tasks"] = user.get("rejected_tasks", 0) + 1
         save_db()
         try:
-            bot.send_message(target_id, "❌ Your recent task submission was **Rejected** by the Admin.", parse_mode="Markdown")
+            bot.send_message(target_id, "❌ আপনার টাস্ক সাবমিশনটি অ্যাডমিন বাতিল করেছেন।", parse_mode="Markdown")
         except:
             pass
-        bot.edit_message_text("Task Rejected. User notified.", user_id, call.message.message_id, reply_markup=None)
+        bot.edit_message_text("কাজ বাতিল করা হয়েছে। ইউজারকে জানানো হয়েছে।", user_id, call.message.message_id, reply_markup=None)
 
 # --- Admin Step Functions ---
 def process_ban(message):
     target_user = get_user_by_input(message.text)
     if target_user:
         ban_user(target_user['_id'])
-        bot.reply_to(message, f"Successfully banned User: {target_user.get('username') or target_user['_id']}.")
+        bot.reply_to(message, f"ইউজারকে সফলভাবে ব্যান করা হয়েছে: {target_user.get('username') or target_user['_id']}।")
     else:
-        bot.reply_to(message, "User not found in database. Make sure they have started the bot before.")
+        bot.reply_to(message, "ডাটাবেজে ইউজারকে পাওয়া যায়নি। নিশ্চিত করুন যে তারা বটটি স্টার্ট করেছেন।")
 
 def process_unban(message):
     target_user = get_user_by_input(message.text)
     if target_user:
         unban_user(target_user['_id'])
-        bot.reply_to(message, f"Successfully unbanned User: {target_user.get('username') or target_user['_id']}.")
+        bot.reply_to(message, f"ইউজারকে সফলভাবে আনব্যান করা হয়েছে: {target_user.get('username') or target_user['_id']}।")
     else:
-        bot.reply_to(message, "User not found in database.")
+        bot.reply_to(message, "ডাটাবেজে ইউজারকে পাওয়া যায়নি।")
 
 def process_balance_user_input(message):
     target_user = get_user_by_input(message.text)
     if target_user:
-        msg = bot.reply_to(message, f"Current balance: {target_user.get('balance', 0)} ৳\nSend the new balance amount for {target_user.get('username') or target_user['_id']}:")
+        msg = bot.reply_to(message, f"বর্তমান ব্যালেন্স: {target_user.get('balance', 0)} ৳\nইউজার {target_user.get('username') or target_user['_id']} এর জন্য নতুন ব্যালেন্স পাঠান:")
         bot.register_next_step_handler(msg, process_balance_amount, target_user['_id'])
     else:
-        bot.reply_to(message, "User not found in database.")
+        bot.reply_to(message, "ডাটাবেজে ইউজারকে পাওয়া যায়নি।")
 
 def process_balance_amount(message, target_id):
     try:
         amount = int(message.text)
         update_user_balance(target_id, amount)
-        bot.reply_to(message, f"Balance has been updated to {amount} ৳.")
+        bot.reply_to(message, f"ব্যালেন্স আপডেট করে {amount} ৳ করা হয়েছে।")
     except ValueError:
-        bot.reply_to(message, "Invalid amount. Must be a number.")
+        bot.reply_to(message, "অকার্যকর পরিমাণ। এটি অবশ্যই একটি সংখ্যা হতে হবে।")
 
 def process_hold_balance_user_input(message):
     target_user = get_user_by_input(message.text)
     if target_user:
-        msg = bot.reply_to(message, f"Current Hold Balance: {target_user.get('hold_balance', 0)} ৳\nSend the new Hold Balance amount for {target_user.get('username') or target_user['_id']}:")
+        msg = bot.reply_to(message, f"বর্তমান হোল্ড ব্যালেন্স: {target_user.get('hold_balance', 0)} ৳\nইউজার {target_user.get('username') or target_user['_id']} এর জন্য নতুন হোল্ড ব্যালেন্স পাঠান:")
         bot.register_next_step_handler(msg, process_hold_balance_amount, target_user['_id'])
     else:
-        bot.reply_to(message, "User not found in database.")
+        bot.reply_to(message, "ডাটাবেজে ইউজারকে পাওয়া যায়নি।")
 
 def process_hold_balance_amount(message, target_id):
     try:
         amount = int(message.text)
         update_user_hold_balance(target_id, amount)
-        bot.reply_to(message, f"Hold Balance has been updated to {amount} ৳.")
+        bot.reply_to(message, f"হোল্ড ব্যালেন্স আপডেট করে {amount} ৳ করা হয়েছে।")
     except ValueError:
-        bot.reply_to(message, "Invalid amount. Must be a number.")
+        bot.reply_to(message, "অকার্যকর পরিমাণ। এটি অবশ্যই একটি সংখ্যা হতে হবে।")
 
 def process_add_channel(message):
     channel = message.text.strip()
     if not channel.startswith('@'):
-        return bot.reply_to(message, "Invalid format. Channel must start with '@' (e.g. @mychannel).")
+        return bot.reply_to(message, "অকার্যকর ফরম্যাট। চ্যানেল অবশ্যই '@' দিয়ে শুরু হতে হবে (যেমন: @mychannel)।")
     
     set_mandatory_channel(channel)
-    bot.reply_to(message, f"Channel set to {channel}.\nAll users must now join this channel.")
+    bot.reply_to(message, f"চ্যানেল সেট করা হয়েছে: {channel}।\nএখন সব ইউজারকে এই চ্যানেলটি জয়েন করতে হবে।")
 
 def process_task_title(message):
     title = message.text.strip()
-    msg = bot.reply_to(message, f"Task Title set to: <b>{title}</b>\nNow, send the <b>URL Link</b> for this task:", parse_mode="HTML")
+    msg = bot.reply_to(message, f"টাস্ক টাইটেল সেট করা হয়েছে: <b>{title}</b>\nএখন এই টাস্কের জন্য <b>URL লিংক</b> পাঠান:", parse_mode="HTML")
     bot.register_next_step_handler(msg, process_task_url, title)
 
 def process_task_url(message, title):
     url = message.text.strip()
     if not url.startswith("http"):
-        return bot.reply_to(message, "Invalid URL. Please start again from /admin and provide a valid link (e.g., https://youtube.com).")
+        return bot.reply_to(message, "অকার্যকর URL। দয়া করে /admin থেকে আবার শুরু করুন এবং একটি সঠিক লিংক দিন (যেমন: https://youtube.com)।")
     
-    msg = bot.reply_to(message, "How much <b>Reward (৳)</b> will the user get for this task?", parse_mode="HTML")
+    msg = bot.reply_to(message, "ইউজার এই কাজের জন্য কত <b>রিওয়ার্ড (৳)</b> পাবেন?", parse_mode="HTML")
     bot.register_next_step_handler(msg, process_task_reward_amount, title, url)
 
 def process_task_reward_amount(message, title, url):
     try:
         reward = int(message.text.strip())
-        msg = bot.reply_to(message, "How many users can complete this task? (Enter a number for the limit):")
+        msg = bot.reply_to(message, "কতজন ইউজার এই কাজটি করতে পারবেন? (লিমিট সংখ্যাটি লিখুন):")
         bot.register_next_step_handler(msg, process_task_limit, title, url, reward)
     except ValueError:
-        bot.reply_to(message, "Invalid amount. Please try adding the task again.")
+        bot.reply_to(message, "অকার্যকর পরিমাণ। দয়া করে আবার কাজটি যোগ করার চেষ্টা করুন।")
 
 def process_task_limit(message, title, url, reward):
     try:
         limit = int(message.text.strip())
         markup = InlineKeyboardMarkup()
         markup.add(
-            InlineKeyboardButton("📝 One Task", callback_data="type_one_task"),
-            InlineKeyboardButton("🎁 Daily Task", callback_data="type_daily_task")
+            InlineKeyboardButton("📝 কাজ করুন", callback_data="type_one_task"),
+            InlineKeyboardButton("🎁 ডেইলি টাস্ক", callback_data="type_daily_task")
         )
-        msg = bot.send_message(message.chat.id, "Select <b>Task Type:</b>", parse_mode="HTML", reply_markup=markup)
+        msg = bot.send_message(message.chat.id, "<b>টাস্ক টাইপ</b> সিলেক্ট করুন:", parse_mode="HTML", reply_markup=markup)
         # Store temporary data in a global or state-based way if needed, but for simplicity here:
         # We'll use a hack by registering the next step but passing arguments
         # Wait, for callbacks we need to handle it in handle_callbacks. Let's adjust.
         # Temporary storage for task being created
         db["temp_task"] = {"title": title, "url": url, "reward": reward, "limit": limit}
     except ValueError:
-        bot.reply_to(message, "Invalid number. Please try adding the task again.")
+        bot.reply_to(message, "অকার্যকর সংখ্যা। দয়া করে আবার কাজটি যোগ করার চেষ্টা করুন।")
 
 def process_task_tutorial_step(message, title, url, reward, limit, task_type):
     tutorial_url = message.text.strip()
     if tutorial_url.lower() == 'skip':
         tutorial_url = None
     elif not tutorial_url.startswith("http"):
-        return bot.reply_to(message, "Invalid URL. Please send a valid link starting with http:// or https://, or type 'skip'.")
+        return bot.reply_to(message, "অকার্যকর URL। দয়া করে একটি সঠিক লিংক দিন অথবা 'skip' লিখুন।")
     
-    msg = bot.reply_to(message, "Send an <b>Image/Photo</b> for this task, or type <b>'skip'</b>:", parse_mode="HTML")
+    msg = bot.reply_to(message, "এই কাজের জন্য একটি <b>ছবি/ফটো</b> পাঠান, অথবা <b>'skip'</b> লিখুন:", parse_mode="HTML")
     bot.register_next_step_handler(msg, process_task_image, title, url, reward, limit, task_type, tutorial_url)
 
 def process_task_image(message, title, url, reward, limit, task_type, tutorial_url):
@@ -583,16 +583,16 @@ def process_task_image(message, title, url, reward, limit, task_type, tutorial_u
         pass 
     
     add_task(title, url, limit, reward, task_type, tutorial_url, image_file_id)
-    tut_text = f"\nTutorial: {tutorial_url}" if tutorial_url else ""
-    bot.reply_to(message, f"✅ <b>Task added successfully!</b>\nTitle: {title}\nType: {task_type}\nReward: {reward}৳\nLimit: {limit} users{tut_text}", parse_mode="HTML")
+    tut_text = f"\nটিউটোরিয়াল: {tutorial_url}" if tutorial_url else ""
+    bot.reply_to(message, f"✅ <b>কাজটি সফলভাবে যোগ করা হয়েছে!</b>\nটাইটেল: {title}\nটাইপ: {task_type}\nরিওয়ার্ড: {reward}৳\nলিমিট: {limit} জন{tut_text}", parse_mode="HTML")
 
 def process_broadcast(message):
     admin_id = message.from_user.id
     users = get_all_users()
     if not users:
-        return bot.reply_to(message, "No users found in database.")
+        return bot.reply_to(message, "ডাটাবেজে কোনো ইউজার পাওয়া যায়নি।")
 
-    bot.send_message(admin_id, f"🚀 Starting broadcast to {len(users)} users... Please wait.")
+    bot.send_message(admin_id, f"🚀 {len(users)} জন ইউজারের কাছে ব্রডকাস্ট পাঠানো শুরু হচ্ছে... দয়া করে অপেক্ষা করুন।")
     
     success = 0
     fail = 0
@@ -609,38 +609,38 @@ def process_broadcast(message):
             fail += 1
             print(f"Broadcast failed for user {target_id}: {e}")
             
-    bot.send_message(admin_id, f"✅ **Broadcast Finished!**\n\n🟢 Success: {success}\n🔴 Failed: {fail}", parse_mode="Markdown")
+    bot.send_message(admin_id, f"✅ **ব্রডকাস্ট শেষ হয়েছে!**\n\n🟢 সফল: {success}\n🔴 ব্যর্থ: {fail}", parse_mode="Markdown")
 
 def process_ref_bonus(message):
     try:
         bonus = int(message.text)
         set_ref_bonus(bonus)
-        bot.reply_to(message, f"✅ Referral bonus updated to {bonus} ৳.")
+        bot.reply_to(message, f"✅ রেফার বোনাস আপডেট করে {bonus} ৳ করা হয়েছে।")
     except ValueError:
-        bot.reply_to(message, "Invalid amount. Must be a number.")
+        bot.reply_to(message, "অকার্যকর পরিমাণ। এটি অবশ্যই একটি সংখ্যা হতে হবে।")
 
 def process_task_submission(message, task_id):
     user_id = message.from_user.id
     if not ADMIN_IDS:
-        return bot.reply_to(message, "❌ Cannot submit task. No Admin ID is configured in the bot.")
+        return bot.reply_to(message, "❌ কাজ সাবমিট করা যাচ্ছে না। বটে কোনো এডমিন আইডি কনফিগার করা নেই।")
     
-    bot.reply_to(message, "✅ Your task proof has been sent to the Admin for review! You will be notified soon.")
+    bot.reply_to(message, "✅ আপনার কাজের প্রমাণ এডমিনের কাছে পাঠানো হয়েছে! আপনাকে শীঘ্রই জানানো হবে।")
     
     markup = InlineKeyboardMarkup()
     markup.add(
-        InlineKeyboardButton("✅ Approve", callback_data=f"app_{user_id}_{task_id}"),
-        InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{task_id}")
+        InlineKeyboardButton("✅ অ্যাপ্রুভ", callback_data=f"app_{user_id}_{task_id}"),
+        InlineKeyboardButton("❌ রিজেক্ট", callback_data=f"rej_{user_id}_{task_id}")
     )
     
     admin_id = ADMIN_IDS[0] # Send to the primary admin
     username_text = f" (@{message.from_user.username})" if message.from_user.username else ""
-    caption = f"📩 **New Task Submission**\nFrom User ID: `{user_id}`{username_text}\nTask ID: `{task_id}`"
+    caption = f"📩 **নতুন টাস্ক সাবমিশন**\nইউজার আইডি: `{user_id}`{username_text}\nটাস্ক আইডি: `{task_id}`"
     
     try:
         if message.photo:
             bot.send_photo(admin_id, message.photo[-1].file_id, caption=caption, parse_mode="Markdown", reply_markup=markup)
         else:
-            bot.send_message(admin_id, f"{caption}\n\n**Proof Text:**\n{message.text}", parse_mode="Markdown", reply_markup=markup)
+            bot.send_message(admin_id, f"{caption}\n\n**প্রমাণ টেক্সট:**\n{message.text}", parse_mode="Markdown", reply_markup=markup)
     except Exception as e:
         print(f"Failed to send task to admin: {e}")
 
@@ -692,14 +692,14 @@ def send_all_users_report(admin_id):
         if not users:
             return bot.send_message(admin_id, "No users found in database.")
         
-        report = "👥 **All Users Report**\n\n"
+        report = "👥 **সব ইউজারের রিপোর্ট**\n\n"
         for u in users:
-            uid = u.get('_id', 'Unknown')
-            uname = f"@{u.get('username')}" if u.get('username') else "N/A"
+            uid = u.get('_id', 'অজ্ঞাত')
+            uname = f"@{u.get('username')}" if u.get('username') else "নেই"
             bal = u.get('balance', 0)
             h_bal = u.get('hold_balance', 0)
-            ban = "Yes" if u.get('banned') else "No"
-            report += f"ID: `{uid}`|User: {uname}|Bal: {bal}৳|Hold: {h_bal}৳|Ban: {ban}\n"
+            ban = "হ্যাঁ" if u.get('banned') else "না"
+            report += f"আইডি: `{uid}`|ইউজার: {uname}|ব্যালেন্স: {bal}৳|হোল্ড: {h_bal}৳|ব্যান: {ban}\n"
         
         if len(report) > 3500:
             file_path = f"users_report_{admin_id}.txt"
@@ -718,13 +718,13 @@ def show_manage_methods(admin_id):
     methods = get_payment_methods()
     markup = InlineKeyboardMarkup()
     for m in methods:
-        markup.add(InlineKeyboardButton(f"❌ Remove {m}", callback_data=f"rm_method_{m}"))
-    markup.add(InlineKeyboardButton("➕ Add Method", callback_data="admin_add_method"))
-    markup.add(InlineKeyboardButton("🔙 Back", callback_data="back_to_admin"))
+        markup.add(InlineKeyboardButton(f"❌ রিমুভ {m}", callback_data=f"rm_method_{m}"))
+    markup.add(InlineKeyboardButton("➕ মেথড যোগ করুন", callback_data="admin_add_method"))
+    markup.add(InlineKeyboardButton("🔙 ফিরে যান", callback_data="back_to_admin"))
     
-    text = "⚙️ **Manage Payment Methods**\n\nCurrent methods:"
+    text = "⚙️ **পেমেন্ট মেথড ম্যানেজ**\n\nবর্তমান মেথডগুলো:"
     if not methods:
-        text += "\nNone"
+        text += "\nনেই"
     else:
         for m in methods:
             text += f"\n- {m}"
@@ -740,7 +740,7 @@ def process_add_method(message):
 def process_withdraw_number(message, method):
     user_id = message.from_user.id
     number = message.text.strip()
-    msg = bot.send_message(user_id, f"Method: {method}\nNumber: {number}\n\nHow much ৳ do you want to withdraw?")
+    msg = bot.send_message(user_id, f"মেথড: {method}\nনাম্বার: {number}\n\nআপনি কত টাকা (৳) উইথড্র করতে চান?")
     bot.register_next_step_handler(msg, process_withdraw_amount, method, number)
 
 def process_withdraw_amount(message, method, number):
@@ -749,24 +749,24 @@ def process_withdraw_amount(message, method, number):
         amount = int(message.text.strip())
         user = get_user(user_id)
         if amount < 20:
-            return bot.reply_to(message, "❌ Minimum withdrawal is 20 ৳.")
+            return bot.reply_to(message, "❌ মিনিমাম উইথড্র ২০ টাকা।")
         if user["balance"] < amount:
-            return bot.reply_to(message, "❌ Insufficient balance!")
+            return bot.reply_to(message, "❌ আপনার পর্যাপ্ত ব্যালেন্স নেই!")
 
-        bot.reply_to(message, "✅ Your withdrawal request has been sent to the Admin!")
+        bot.reply_to(message, "✅ আপনার উইথড্রাল রিকোয়েস্টটি এডমিনের কাছে পাঠানো হয়েছে!")
         
         # Notify Admin
         admin_id = ADMIN_IDS[0] if ADMIN_IDS else user_id
         markup = InlineKeyboardMarkup()
         markup.add(
-            InlineKeyboardButton("✅ Approve", callback_data=f"wd_app_{user_id}_{amount}_{method}_{number}"),
-            InlineKeyboardButton("❌ Reject", callback_data=f"wd_rej_{user_id}")
+            InlineKeyboardButton("✅ অ্যাপ্রুভ", callback_data=f"wd_app_{user_id}_{amount}_{method}_{number}"),
+            InlineKeyboardButton("❌ রিজেক্ট", callback_data=f"wd_rej_{user_id}")
         )
-        caption = f"💰 **New Withdrawal Request**\nUser: `{user_id}`\nAmount: {amount}৳\nMethod: {method}\nNumber: `{number}`"
+        caption = f"💰 **নতুন উইথড্রাল রিকোয়েস্ট**\nইউজার আইডি: `{user_id}`\nপরিমাণ: {amount}৳\nমেথড: {method}\nনাম্বার: `{number}`"
         bot.send_message(admin_id, caption, parse_mode="Markdown", reply_markup=markup)
         
     except ValueError:
-        bot.reply_to(message, "Invalid amount. Please try again.")
+        bot.reply_to(message, "অকার্যকর পরিমাণ। দয়া করে আবার চেষ্টা করুন।")
 
 
 # --- Text Message Handler ---
@@ -782,17 +782,17 @@ def handle_messages(message):
     if not check_join(user_id):
         return bot.reply_to(
             message, 
-            "⚠️ You must join our official channel to use this bot!", 
+            "⚠️ এই বটটি ব্যবহার করতে আপনাকে অবশ্যই আমাদের অফিসিয়াল চ্যানেলে জয়েন করতে হবে!", 
             reply_markup=get_join_keyboard()
         )
 
     text = message.text
-    if text == "📝 One Task":
+    if text == "📝 কাজ করুন":
         tasks = [t for t in get_all_tasks() if t.get('type') == 'one_task']
         if not tasks:
             bot.reply_to(message, "<b>📝 বর্তমান কোনো কাজ নেই</b>", parse_mode="HTML")
         else:
-            bot.reply_to(message, "<b>📝 Available Tasks:</b>", parse_mode="HTML")
+            bot.reply_to(message, "<b>📝 উপলব্ধ কাজগুলো:</b>", parse_mode="HTML")
             for task in tasks:
                 task_id = str(task.get('_id', ''))
                 title = task.get('title', 'Task')
@@ -804,8 +804,8 @@ def handle_messages(message):
                 image_id = task.get('image_file_id')
                 
                 msg_text = (
-                    f"🔴 <b>Title: {title}</b>\n"
-                    f"👥 <b>Works : {completed}/{limit} Complete ✅</b>\n"
+                    f"🔴 <b>টাইটেল: {title}</b>\n"
+                    f"👥 <b>কাজ : {completed}/{limit} টি সম্পন্ন হয়েছে ✅</b>\n"
                     f"💸 <b>প্রতি কাজ {reward} টাকা</b>"
                 )
                 
@@ -814,12 +814,12 @@ def handle_messages(message):
                 else:
                     bot.send_message(message.chat.id, msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML", disable_web_page_preview=True)
                     
-    elif text == "🎁 Daily Task":
+    elif text == "🎁 ডেইলি টাস্ক":
         tasks = [t for t in get_all_tasks() if t.get('type') == 'daily_task']
         if not tasks:
             bot.reply_to(message, "<b>📝 বর্তমান কোনো কাজ নেই</b>", parse_mode="HTML")
         else:
-            bot.reply_to(message, "<b>🎁 Daily Tasks:</b>", parse_mode="HTML")
+            bot.reply_to(message, "<b>🎁 ডেইলি টাস্কসমূহ:</b>", parse_mode="HTML")
             for task in tasks:
                 task_id = str(task.get('_id', ''))
                 title = task.get('title', 'Task')
@@ -831,8 +831,8 @@ def handle_messages(message):
                 image_id = task.get('image_file_id')
                 
                 msg_text = (
-                    f"🔴 <b>Title: {title}</b>\n"
-                    f"👥 <b>Works : {completed}/{limit} Complete ✅</b>\n"
+                    f"🔴 <b>টাইটেল: {title}</b>\n"
+                    f"👥 <b>কাজ : {completed}/{limit} টি সম্পন্ন হয়েছে ✅</b>\n"
                     f"💸 <b>প্রতি কাজ {reward} টাকা</b>"
                 )
                 
@@ -840,20 +840,20 @@ def handle_messages(message):
                     bot.send_photo(message.chat.id, image_id, caption=msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML")
                 else:
                     bot.send_message(message.chat.id, msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML", disable_web_page_preview=True)
-    elif text == "👥 Invite":
+    elif text == "👥 রেফার করুন":
         active = user.get("active_referrals", 0)
         inactive = user.get("inactive_referrals", 0)
         invite_msg = (
-            f"✅ <b>Active {active}.0 রেফার</b>\n"
-            f"❌ <b>Inactive {inactive}.0 রেফার</b>\n"
+            f"✅ <b>সক্রিয় {active}.0 রেফার</b>\n"
+            f"❌ <b>নিষ্ক্রিয় {inactive}.0 রেফার</b>\n"
             f"👥 <b>প্রতি রেফার ১০ টাকা</b>\n\n"
-            f"👥 <b>Invite লিংক 👇</b>\n"
+            f"👥 <b>রেফার লিংক 👇</b>\n"
             f"https://t.me/{bot.get_me().username}?start={user_id}"
         )
         bot.reply_to(message, invite_msg, parse_mode="HTML")
-    elif text == "💳 Withdraw":
+    elif text == "💳 উইথড্র":
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("💳 Withdraw", callback_data="user_withdraw"))
+        markup.add(InlineKeyboardButton("💳 উইথড্র করুন", callback_data="user_withdraw"))
         withdraw_text = (
             "<b>🧑💻 মিনিমাম উইথড্র ২০ টাকা 💸</b>\n\n"
             "<b>🧑💻 পেমেন্ট মেথড</b>\n"
@@ -861,20 +861,20 @@ def handle_messages(message):
             "<b>💵 উইথড্র চার্জ ১০%</b>"
         )
         bot.reply_to(message, withdraw_text, parse_mode="HTML", reply_markup=markup)
-    elif text == "🧑‍💻 My Profile":
+    elif text == "🧑‍💻 আমার প্রোফাইল":
         balance = user.get("balance", 0)
         hold = user.get("hold_balance", 0)
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("💳 Withdraw", callback_data="user_withdraw"))
+        markup.add(InlineKeyboardButton("💳 উইথড্র করুন", callback_data="user_withdraw"))
         profile_text = (
-            f"🧑‍💻 <b>My Profile ID: <code>{user_id}</code></b>\n\n"
-            f"💰 <b>Available Balance: {balance} ৳</b>\n"
-            f"💼 <b>Hold Balance: {hold} ৳</b>\n\n"
-            f"💸 <b>মিনিমাম উইথড্র মাএ ২০ টাকা</b> 💸\n"
+            f"🧑‍💻 <b>আমার প্রোফাইল আইডি: <code>{user_id}</code></b>\n\n"
+            f"💰 <b>বর্তমান ব্যালেন্স: {balance} ৳</b>\n"
+            f"💼 <b>হোল্ড ব্যালেন্স: {hold} ৳</b>\n\n"
+            f"💸 <b>মিনিমাম উইথড্র মাত্র ২০ টাকা</b> 💸\n"
             f"🧑‍💻 <b>পেমেন্ট বিকাশ/নগদ</b> 🏧"
         )
         bot.reply_to(message, profile_text, parse_mode="HTML", reply_markup=markup)
-    elif text == "📊 Status":
+    elif text == "📊 স্ট্যাটাস":
         comp = user.get("completed_tasks", 0)
         rej = user.get("rejected_tasks", 0)
         status_text = (
@@ -883,7 +883,7 @@ def handle_messages(message):
             f"❌ <b>রিজেক্ট : {rej} টা কাজ</b>"
         )
         bot.reply_to(message, status_text, parse_mode="HTML")
-    elif text == "❓ FAQ":
+    elif text == "❓ প্রশ্ন ও উত্তর":
         faq_text = (
             "<b>যে কোনো সমস্যা টেলিগ্ৰাম চ্যানেল জয়েন করুন এবং সকল আপডেট ও পেমেন্ট প্রুফ দেখুন 🧑💻</b>\n\n"
             "<b>🔴 টেলিগ্ৰাম চ্যানেল 👇</b>\n"
@@ -892,7 +892,7 @@ def handle_messages(message):
         bot.reply_to(message, faq_text, parse_mode="HTML")
 
     else:
-        bot.reply_to(message, "I didn't understand that. Please use the menu.", reply_markup=get_main_keyboard())
+        bot.reply_to(message, "আমি আপনার কথাটি বুঝতে পারিনি। দয়া করে মেনু ব্যবহার করুন।", reply_markup=get_main_keyboard())
 
 
 # --- FastAPI routes for Webhook ---
