@@ -806,12 +806,8 @@ def handle_messages(message):
                 msg_text = (
                     f"🔴 <b>Title: {title}</b>\n"
                     f"👥 <b>Works : {completed}/{limit} Complete ✅</b>\n"
-                    f"💸 <b>প্রতি কাজ {reward} টাকা</b>\n\n"
-                    f"👉 <b>কাজের লিংক (<a href='{url}'>Link</a>) 👈</b>\n"
+                    f"💸 <b>প্রতি কাজ {reward} টাকা</b>"
                 )
-                if tut_url:
-                    msg_text += f"👉 <b>কাজের ভিডিও (<a href='{tut_url}'>Video</a>) 👈</b>\n"
-                msg_text += f"👉 <b>প্রুফ জমা করুন 👈</b>"
                 
                 if image_id:
                     bot.send_photo(message.chat.id, image_id, caption=msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML")
@@ -837,12 +833,8 @@ def handle_messages(message):
                 msg_text = (
                     f"🔴 <b>Title: {title}</b>\n"
                     f"👥 <b>Works : {completed}/{limit} Complete ✅</b>\n"
-                    f"💸 <b>প্রতি কাজ {reward} টাকা</b>\n\n"
-                    f"👉 <b>কাজের লিংক (<a href='{url}'>Link</a>) 👈</b>\n"
+                    f"💸 <b>প্রতি কাজ {reward} টাকা</b>"
                 )
-                if tut_url:
-                    msg_text += f"👉 <b>কাজের ভিডিও (<a href='{tut_url}'>Video</a>) 👈</b>\n"
-                msg_text += f"👉 <b>প্রুফ জমা করুন 👈</b>"
                 
                 if image_id:
                     bot.send_photo(message.chat.id, image_id, caption=msg_text, reply_markup=get_single_task_keyboard(task_id, url, tut_url), parse_mode="HTML")
@@ -924,4 +916,4 @@ def home():
     return {"status": "Bot is running on Render!", "ping_endpoint": "/ping"}
 
 if __name__ == '__main__':
-    print("Bot configuration loaded.")
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
